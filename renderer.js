@@ -26,7 +26,8 @@ let currentSettings = {
   mouseOptimize: true,
   settingsLeft: false,
   lockPosition: false,
-  activeModel: 'procedural'
+  activeModel: 'procedural',
+  clickCount: 0
 };
 
 let discoveredModels = [];
@@ -122,6 +123,32 @@ function init() {
 
   // Handle Resize
   window.addEventListener('resize', onWindowResize);
+
+  // Listen for Steam achievement updates from main process
+  ipcRenderer.on('steam-achievement-unlocked', (event, result) => {
+    if (result.success) {
+      const achievementsInfo = {
+        'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
+        'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
+        'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
+        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘'
+      };
+      const friendlyName = achievementsInfo[result.name] || result.name;
+      showSpeechBubble(`🏆 Steam Achievement Unlocked:\n${friendlyName}`, 5000);
+    } else if (result.alreadyUnlocked) {
+      console.log(`Achievement already active on Steam: ${result.name}`);
+    } else if (!result.isSteamOnline) {
+      // Offline mode fallback: show the mock achievement toast
+      const achievementsInfo = {
+        'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
+        'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
+        'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
+        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘'
+      };
+      const friendlyName = achievementsInfo[result.name] || result.name;
+      showSpeechBubble(`🏆 Achievement Unlocked (Offline):\n${friendlyName}`, 5000);
+    }
+  });
 }
 
 function createMascot() {
@@ -420,6 +447,17 @@ function triggerInteraction() {
   ];
   const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
   showSpeechBubble(randomReaction, 2000);
+
+  // Increment and trigger achievements
+  currentSettings.clickCount = (currentSettings.clickCount || 0) + 1;
+  saveSettingsFile();
+
+  if (currentSettings.clickCount === 1) {
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_WIN_ONE_GAME');
+  }
+  if (currentSettings.clickCount === 10) {
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_WIN_100_GAMES');
+  }
 }
 
 function onWindowResize() {
@@ -692,6 +730,7 @@ settingsLeft=false`;
           if (key === 'settingsLeft') currentSettings.settingsLeft = (val === 'true');
           if (key === 'lockPosition') currentSettings.lockPosition = (val === 'true');
           if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
+          if (key === 'clickCount') currentSettings.clickCount = parseInt(val, 10) || 0;
         }
       });
       return true;
@@ -722,7 +761,8 @@ gpuOptimize=${currentSettings.gpuOptimize}
 mouseOptimize=${currentSettings.mouseOptimize}
 settingsLeft=${currentSettings.settingsLeft}
 lockPosition=${currentSettings.lockPosition}
-activeModel=${currentSettings.activeModel}`;
+activeModel=${currentSettings.activeModel}
+clickCount=${currentSettings.clickCount}`;
 
   try {
     fs.writeFileSync(filePath, content, 'utf8');
@@ -890,6 +930,9 @@ function setupSettingsUI() {
     // 2. Save settings to local configuration file
     saveSettingsFile();
 
+    // Trigger settings configuration achievement
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_HEAVY_RADAR');
+
     // Handle model load when changed
     if (modelChanged) {
       if (mixer) {
@@ -988,6 +1031,7 @@ function checkBreakReminders(now) {
     if (!isSettingsOpen && animationState.type !== 'interact') {
       const reminder = breakReminders[Math.floor(Math.random() * breakReminders.length)];
       showSpeechBubble(reminder, 7000);
+      ipcRenderer.send('trigger-steam-achievement', 'ACH_TRAVEL_FAR');
     }
   }
 }
