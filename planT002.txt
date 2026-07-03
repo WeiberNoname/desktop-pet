@@ -1,0 +1,88 @@
+================================================================================
+PLAN T002: HARDWARE EFFICIENCY PLAN - FORCING DEDICATED GPU SELECTION
+================================================================================
+
+This plan details solutions for forcing the WebGL mascot companion app to run
+on high-performance dedicated graphics cards (e.g., NVIDIA) rather than default
+low-power integrated chipsets (e.g., Intel), optimizing framerates and CPU load.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: PROGRAMMATIC ELECTRON COMMAND-LINE FLAGS (Zero-Configuration)
+--------------------------------------------------------------------------------
+We can instruct Electron's Chromium engine to request the high-performance GPU
+upon launch by appending switches inside the main process script [main.js].
+
+How it works:
+Before Electron emits the 'ready' event, we inject the following parameters:
+```javascript
+// Request the OS to run Chromium WebGL threads on the discrete graphics processor
+app.commandLine.appendSwitch('force_high_performance_gpu', 'true');
+
+// Bypass Chromium's internal driver blocklists to ensure hardware acceleration is active
+app.commandLine.appendSwitch('ignore-gpu-blocklist', 'true');
+```
+
+Pros:
+* Completely automated. The end-user does not have to modify any system settings.
+* Cross-platform compatible (works for NVIDIA, AMD, and Intel discrete GPUs).
+
+Cons:
+* Can be overridden by Windows OS Graphics Scheduling rules on certain laptop models.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: WINDOWS OS GRAPHICS PERFORMANCE PREFERENCE (Kernel Override)
+--------------------------------------------------------------------------------
+Windows 10/11 includes a display graphics scheduler that overrides application
+requests. Users can manually designate the compiled mascot to run in High-Performance mode.
+
+How it works (Step-by-Step):
+1. Open the Windows Start Menu, type "Graphics settings", and press Enter.
+2. Under the "Graphics performance preference" dropdown, choose "Desktop app".
+3. Click the "Browse" button.
+4. Navigate to your compiled executable path and select `DesktopPet.exe`:
+   `C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet\DesktopPet-win32-x64\DesktopPet.exe`
+5. Click on the added "DesktopPet" app listing, and click the "Options" button.
+6. Select the "High performance" radio button (which will display your NVIDIA GPU).
+7. Click "Save".
+
+Pros:
+* Extremely reliable. The GPU scheduling is handled directly at the Windows OS Kernel level.
+* Guarantees NVIDIA selection regardless of driver configurations.
+
+Cons:
+* Requires manual configuration steps by the end-user.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: NVIDIA CONTROL PANEL PROFILE (Driver-Level Override)
+--------------------------------------------------------------------------------
+The NVIDIA display driver control panel allows users to create customized hardware
+profiles for individual executables.
+
+How it works (Step-by-Step):
+1. Right-click on your Windows desktop and select "NVIDIA Control Panel".
+2. In the left navigation sidebar, select "Manage 3D Settings".
+3. Click on the "Program Settings" tab.
+4. Click the "Add" button, click "Browse", and select `DesktopPet.exe` from your compiled folder.
+5. In the dropdown menu "Select the preferred graphics processor for this program",
+   change the selection from "Use global setting (Auto-select)" to:
+   "High-performance NVIDIA processor"
+6. Click "Apply" in the bottom-right corner.
+
+Pros:
+* Direct driver-level optimization.
+* Allows developers to tweak advanced driver settings (e.g. forcing VSync, disabling
+  power-throttling, or optimizing anti-aliasing) specifically for the mascot.
+
+Cons:
+* Vendor-specific (only works on systems containing NVIDIA hardware).
+* Requires manual setup by the end-user.
+
+--------------------------------------------------------------------------------
+RECOMMENDED IMPLEMENTATION ROADMAP
+================================================================================
+We recommend a hybrid implementation:
+1. Apply Alternative 1 (Programmatic flags) inside the main process code by default, so
+   most users get GPU acceleration automatically.
+2. Update the user manuals (README.md) to instruct advanced users on how to apply
+   Alternative 2 (Windows override) or Alternative 3 (NVIDIA override) if their laptop's
+   OS settings block Electron's automatic requests.

@@ -1,8 +1,53 @@
 import * as THREE from './node_modules/three/build/three.module.js';
+import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 const { ipcRenderer } = window.require('electron');
+const fs = window.require('fs');
+const path = window.require('path');
+const { pathToFileURL } = window.require('url');
 
-let scene, camera, renderer, characterGroup;
+let scene, camera, renderer, characterGroup, innerModelGroup, collisionProxy;
+let mixer;
+let customModelLoaded = false;
+
+// Settings Panel configurations
+let currentSettings = {
+  width: 350,
+  height: 350,
+  scale: 1.0,
+  bobbing: true,
+  spinX: false,
+  spinY: false,
+  spinZ: false,
+  speedX: 1.0,
+  speedY: 1.0,
+  speedZ: 1.0,
+  gpuOptimize: true,
+  mouseOptimize: true,
+  settingsLeft: false,
+  lockPosition: false,
+  activeModel: 'procedural'
+};
+
+let discoveredModels = [];
+let speechTimeout = null;
+let lastIdleThoughtTime = Date.now();
+let lastBreakReminderTime = Date.now();
+
+// Helper function to update gear position dynamically
+function updateGearPosition() {
+  const gearBtn = document.getElementById('settings-btn');
+  if (!gearBtn) return;
+  if (currentSettings.settingsLeft) {
+    gearBtn.style.left = '10px';
+    gearBtn.style.right = 'auto';
+  } else {
+    gearBtn.style.right = '10px';
+    gearBtn.style.left = 'auto';
+  }
+}
+let hasSettingsFile = false;
+let isSettingsOpen = false;
 let isMouseOverCharacter = false;
 let isDragging = false;
 let dragStartScreenX = 0;
@@ -18,6 +63,9 @@ let animationState = {
 
 function init() {
   const container = document.getElementById('container');
+  
+  // Load settings configuration file if it exists in assets/
+  hasSettingsFile = readSettingsFile();
 
   // 1. Create Scene
   scene = new THREE.Scene();
@@ -52,14 +100,25 @@ function init() {
   rimLight.position.set(0, 5, -5);
   scene.add(rimLight);
 
-  // 5. Build the Cute Procedural Mascot
-  createMascot();
+  // 5. Auto-detect custom asset in assets/ or load procedural mascot
+  detectAndLoadAsset();
 
   // 6. Hook up Interaction & Window Dragging
   setupInteraction();
 
+  // 6.5. Setup Settings UI panel listeners if enabled
+  if (hasSettingsFile) {
+    setupSettingsUI();
+    updateGearPosition();
+  }
+
   // 7. Start Animation Loop
   animate();
+
+  // Trigger startup greeting speech bubble
+  setTimeout(() => {
+    showSpeechBubble("Hi there! I'm your desktop pet! 🐰✨", 4000);
+  }, 1800);
 
   // Handle Resize
   window.addEventListener('resize', onWindowResize);
@@ -67,6 +126,8 @@ function init() {
 
 function createMascot() {
   characterGroup = new THREE.Group();
+  innerModelGroup = new THREE.Group();
+  characterGroup.add(innerModelGroup);
 
   // Materials configuration
   // Premium, glossy clay/vinyl toy shader
@@ -112,7 +173,7 @@ function createMascot() {
   const bodyMesh = new THREE.Mesh(bodyGeom, bodyMaterial);
   bodyMesh.scale.set(1.15, 0.95, 1.15);
   bodyMesh.position.y = -0.15;
-  characterGroup.add(bodyMesh);
+  innerModelGroup.add(bodyMesh);
 
   // --- Eyes & Highlights ---
   const eyeGeom = new THREE.SphereGeometry(0.12, 16, 16);
@@ -124,8 +185,8 @@ function createMascot() {
   
   const leftEyeHighlight1 = new THREE.Mesh(highlightGeom, eyeHighlightMaterial);
   leftEyeHighlight1.position.set(-0.30, 0.11, 0.99);
-  characterGroup.add(leftEye);
-  characterGroup.add(leftEyeHighlight1);
+  innerModelGroup.add(leftEye);
+  innerModelGroup.add(leftEyeHighlight1);
 
   // Right Eye
   const rightEye = new THREE.Mesh(eyeGeom, eyeMaterial);
@@ -133,8 +194,8 @@ function createMascot() {
   
   const rightEyeHighlight1 = new THREE.Mesh(highlightGeom, eyeHighlightMaterial);
   rightEyeHighlight1.position.set(0.40, 0.11, 0.99);
-  characterGroup.add(rightEye);
-  characterGroup.add(rightEyeHighlight1);
+  innerModelGroup.add(rightEye);
+  innerModelGroup.add(rightEyeHighlight1);
 
   // --- Blush Cheeks ---
   const blushGeom = new THREE.SphereGeometry(0.16, 16, 16);
@@ -143,13 +204,13 @@ function createMascot() {
   leftBlush.scale.set(1, 0.6, 0.2);
   leftBlush.position.set(-0.55, -0.12, 0.88);
   leftBlush.rotation.set(0.1, 0.3, -0.1);
-  characterGroup.add(leftBlush);
+  innerModelGroup.add(leftBlush);
 
   const rightBlush = new THREE.Mesh(blushGeom, blushMaterial);
   rightBlush.scale.set(1, 0.6, 0.2);
   rightBlush.position.set(0.55, -0.12, 0.88);
   rightBlush.rotation.set(0.1, -0.3, 0.1);
-  characterGroup.add(rightBlush);
+  innerModelGroup.add(rightBlush);
 
   // --- Cute Smile ---
   // Torus geometry cut in half to create an upward arc
@@ -157,7 +218,7 @@ function createMascot() {
   const smileMesh = new THREE.Mesh(smileGeom, eyeMaterial);
   smileMesh.position.set(0, -0.06, 0.99);
   smileMesh.rotation.z = Math.PI; // Invert to make it curve upwards
-  characterGroup.add(smileMesh);
+  innerModelGroup.add(smileMesh);
 
   // --- Bunny/Cat Ears ---
   const earGeom = new THREE.ConeGeometry(0.2, 0.8, 18);
@@ -176,7 +237,7 @@ function createMascot() {
   leftEarInner.position.set(0, -0.05, 0.06);
   leftEarGroup.add(leftEarInner);
 
-  characterGroup.add(leftEarGroup);
+  innerModelGroup.add(leftEarGroup);
 
   // Right Ear
   const rightEarGroup = new THREE.Group();
@@ -192,7 +253,7 @@ function createMascot() {
   rightEarInner.position.set(0, -0.05, 0.06);
   rightEarGroup.add(rightEarInner);
 
-  characterGroup.add(rightEarGroup);
+  innerModelGroup.add(rightEarGroup);
 
   // --- Feet ---
   const footGeom = new THREE.SphereGeometry(0.22, 16, 16);
@@ -200,12 +261,19 @@ function createMascot() {
   const leftFoot = new THREE.Mesh(footGeom, footMaterial);
   leftFoot.scale.set(1.2, 0.7, 1.2);
   leftFoot.position.set(-0.4, -0.9, 0.2);
-  characterGroup.add(leftFoot);
+  innerModelGroup.add(leftFoot);
 
   const rightFoot = new THREE.Mesh(footGeom, footMaterial);
   rightFoot.scale.set(1.2, 0.7, 1.2);
   rightFoot.position.set(0.4, -0.9, 0.2);
-  characterGroup.add(rightFoot);
+  innerModelGroup.add(rightFoot);
+
+  // Create an invisible simplified box collision proxy matching mascot scale
+  const proxyGeom = new THREE.BoxGeometry(1.6, 2.0, 1.6);
+  const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
+  collisionProxy = new THREE.Mesh(proxyGeom, proxyMat);
+  collisionProxy.position.set(0, 0, 0);
+  characterGroup.add(collisionProxy);
 
   // Tilt character slightly forward towards camera
   characterGroup.rotation.x = 0.08;
@@ -216,6 +284,7 @@ function createMascot() {
 function setupInteraction() {
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
+  let lastRaycastTime = 0;
 
   // Track mouse movements to update window ignore-mouse states
   window.addEventListener('mousemove', (event) => {
@@ -232,14 +301,28 @@ function setupInteraction() {
       return;
     }
 
+    // Throttle hover raycast updates under Seamless Performance Mode
+    if (currentSettings.mouseOptimize) {
+      const now = Date.now();
+      if (now - lastRaycastTime < 16) return;
+      lastRaycastTime = now;
+    }
+
     // Convert mouse client coordinates to Normalized Device Coordinates (-1 to +1)
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(characterGroup.children, true);
+    
+    // Raycast against simplified box proxy (Seamless Mode) or recursively through full meshes (Precise Mode)
+    let intersects = [];
+    if (currentSettings.mouseOptimize && collisionProxy) {
+      intersects = raycaster.intersectObject(collisionProxy);
+    } else {
+      intersects = raycaster.intersectObjects(characterGroup.children, true);
+    }
 
-    if (intersects.length > 0) {
+    if (intersects.length > 0 || isSettingsOpen) {
       if (!isMouseOverCharacter) {
         isMouseOverCharacter = true;
         document.body.style.cursor = 'pointer';
@@ -257,6 +340,7 @@ function setupInteraction() {
   });
 
   window.addEventListener('mousedown', (event) => {
+    if (isSettingsOpen || currentSettings.lockPosition) return;
     if (isMouseOverCharacter && event.button === 0) { // Left click
       isDragging = true;
       dragStartScreenX = event.screenX;
@@ -279,11 +363,63 @@ function setupInteraction() {
   });
 }
 
+function showSpeechBubble(text, durationMs = 3000) {
+  const bubble = document.getElementById('speech-bubble');
+  const textEl = document.getElementById('bubble-text');
+  if (!bubble || !textEl) return;
+  
+  if (speechTimeout) {
+    clearTimeout(speechTimeout);
+    speechTimeout = null;
+  }
+  
+  textEl.textContent = text;
+  bubble.classList.remove('hidden');
+  bubble.classList.add('show');
+  
+  if (durationMs > 0) {
+    speechTimeout = setTimeout(() => {
+      bubble.classList.remove('show');
+      setTimeout(() => {
+        if (!bubble.classList.contains('show')) {
+          bubble.classList.add('hidden');
+        }
+      }, 200);
+    }, durationMs);
+  }
+}
+
+function hideSpeechBubble() {
+  const bubble = document.getElementById('speech-bubble');
+  if (!bubble) return;
+  if (speechTimeout) {
+    clearTimeout(speechTimeout);
+    speechTimeout = null;
+  }
+  bubble.classList.remove('show');
+  setTimeout(() => {
+    if (!bubble.classList.contains('show')) {
+      bubble.classList.add('hidden');
+    }
+  }, 200);
+}
+
 function triggerInteraction() {
   if (animationState.type === 'interact') return;
 
   animationState.type = 'interact';
   animationState.startTime = Date.now();
+
+  const reactions = [
+    "Wheee! 🚀",
+    "Hold on tight! 🌪️",
+    "Double flip! 💫",
+    "That tickles! 😄",
+    "Look at me! ✨",
+    "Yippee! 🎉"
+  ];
+  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+  showSpeechBubble(randomReaction, 2000);
 }
 
 function onWindowResize() {
@@ -292,13 +428,605 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+function getAssetsPath() {
+  const exeDir = path.dirname(process.execPath);
+  const packagedAssetsPath = path.join(exeDir, 'assets');
+  
+  if (fs.existsSync(packagedAssetsPath)) {
+    return packagedAssetsPath;
+  }
+  return path.join(process.cwd(), 'assets');
+}
+
+function scanForModels() {
+  discoveredModels = [];
+  const assetsDir = getAssetsPath();
+  
+  if (!fs.existsSync(assetsDir)) {
+    try {
+      fs.mkdirSync(assetsDir, { recursive: true });
+    } catch (e) {
+      console.warn("Could not create assets directory:", e);
+    }
+  }
+
+  if (fs.existsSync(assetsDir)) {
+    try {
+      const files = fs.readdirSync(assetsDir);
+      files.forEach(file => {
+        if (file.endsWith('.glb') || file.endsWith('.gltf')) {
+          discoveredModels.push(file);
+        }
+      });
+    } catch (err) {
+      console.error('Error scanning models:', err);
+    }
+  }
+}
+
+function detectAndLoadAsset() {
+  scanForModels();
+  
+  if (currentSettings.activeModel === 'procedural') {
+    console.log('Active mascot is procedural bunny.');
+    createMascot();
+    return;
+  }
+  
+  if (currentSettings.activeModel && discoveredModels.includes(currentSettings.activeModel)) {
+    const assetsDir = getAssetsPath();
+    const fullPath = path.join(assetsDir, currentSettings.activeModel);
+    console.log('Loading active model:', fullPath);
+    loadCustomModel(fullPath);
+    return;
+  }
+  
+  // Fallback if activeModel doesn't exist
+  if (discoveredModels.length > 0) {
+    currentSettings.activeModel = discoveredModels[0];
+    const assetsDir = getAssetsPath();
+    const fullPath = path.join(assetsDir, currentSettings.activeModel);
+    console.log('Active model not found. Defaulting to first discovered model:', fullPath);
+    loadCustomModel(fullPath);
+    return;
+  }
+  
+  console.log('No custom asset found. Defaulting to procedural mascot.');
+  currentSettings.activeModel = 'procedural';
+  createMascot();
+}
+
+function fallbackToProcedural() {
+  console.log('Falling back to procedural mascot.');
+  customModelLoaded = false;
+  currentSettings.activeModel = 'procedural';
+  if (mixer) {
+    mixer.stopAllAction();
+    mixer = null;
+  }
+  if (characterGroup) {
+    scene.remove(characterGroup);
+  }
+  
+  // Reset window viewport and camera settings back to defaults
+  const defaultSize = 350;
+  camera.aspect = 1.0;
+  camera.updateProjectionMatrix();
+  renderer.setSize(defaultSize, defaultSize);
+  camera.position.set(0, 0, 5.5);
+  ipcRenderer.send('resize-window', { width: defaultSize, height: defaultSize });
+  
+  createMascot();
+}
+
+function loadCustomModel(filePath) {
+  let fileUrl = filePath;
+  try {
+    fileUrl = pathToFileURL(filePath).href;
+  } catch (e) {
+    console.warn("Could not convert path to file URL, using raw path:", e);
+  }
+
+  // Create an empty group temporarily so other scripts don't fail during loading
+  characterGroup = new THREE.Group();
+  scene.add(characterGroup);
+
+  try {
+    const loader = new GLTFLoader();
+    loader.load(fileUrl, (gltf) => {
+      // Clear the temporary empty group
+      if (characterGroup) scene.remove(characterGroup);
+
+      characterGroup = new THREE.Group();
+      scene.add(characterGroup);
+
+      const model = gltf.scene;
+
+      // Center model geometry using bounding box
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+
+      // Center model geometry relative to characterGroup pivot
+      model.position.set(-center.x, -center.y, -center.z);
+      
+      // Load model at its original size scale (1, 1, 1) without resizing the asset
+      const innerGroup = new THREE.Group();
+      innerGroup.add(model);
+      innerGroup.position.y = 0; // Vertically center inside our group
+      
+      characterGroup.add(innerGroup);
+      innerModelGroup = innerGroup;
+
+      // Create an invisible simplified box collision proxy matching custom model size bounds
+      const proxyGeom = new THREE.BoxGeometry(size.x, size.y, size.z);
+      const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
+      collisionProxy = new THREE.Mesh(proxyGeom, proxyMat);
+      collisionProxy.position.set(0, 0, 0);
+      characterGroup.add(collisionProxy);
+
+      const padding = 1.35;
+      const pixelsPerUnit = 175; // Scale mapping (175 screen pixels per Three.js unit)
+
+      if (hasSettingsFile) {
+        // Apply manual scaling from settings
+        characterGroup.scale.set(currentSettings.scale, currentSettings.scale, currentSettings.scale);
+
+        // Update WebGL viewports to match settings sizes
+        camera.aspect = currentSettings.width / currentSettings.height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(currentSettings.width, currentSettings.height);
+
+        // Position camera Z so the custom scaled model fits comfortably
+        const visibleHeight = size.y * currentSettings.scale * padding;
+        const zPos = visibleHeight / (2 * Math.tan((camera.fov * Math.PI) / 360));
+        camera.position.set(0, 0, zPos + ((size.z * currentSettings.scale) / 2));
+
+        // Trigger IPC resize command to adjust the Electron frame
+        ipcRenderer.send('resize-window', { width: currentSettings.width, height: currentSettings.height });
+      } else {
+        characterGroup.scale.set(1, 1, 1);
+
+        // Dynamically calculate the ideal desktop window size in pixels
+        let winWidth = Math.round(size.x * pixelsPerUnit * padding);
+        let winHeight = Math.round(size.y * pixelsPerUnit * padding);
+        
+        // Limit bounds to keep it reasonable (min 150px, max 800px)
+        winWidth = Math.max(150, Math.min(800, winWidth));
+        winHeight = Math.max(150, Math.min(800, winHeight));
+        
+        // Update WebGL viewports
+        camera.aspect = winWidth / winHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(winWidth, winHeight);
+        
+        // Position camera Z so the original model size fits comfortably
+        const visibleHeight = size.y * padding;
+        const zPos = visibleHeight / (2 * Math.tan((camera.fov * Math.PI) / 360));
+        camera.position.set(0, 0, zPos + (size.z / 2));
+
+        // Resize Electron window container
+        ipcRenderer.send('resize-window', { width: winWidth, height: winHeight });
+      }
+
+      // Load animations
+      if (gltf.animations && gltf.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(model);
+        const action = mixer.clipAction(gltf.animations[0]);
+        action.play();
+      }
+      
+      customModelLoaded = true;
+      console.log('Successfully loaded custom model at original scale:', filePath);
+    }, undefined, (error) => {
+      console.error('Failed to load custom GLB/GLTF model:', error);
+      fallbackToProcedural();
+    });
+  } catch (err) {
+    console.error('Synchronous loader crash:', err);
+    fallbackToProcedural();
+  }
+}
+
+function readSettingsFile() {
+  const assetsDir = getAssetsPath();
+  const settingsFile = path.join(assetsDir, 'settings');
+  const settingsTxtFile = path.join(assetsDir, 'settings.txt');
+  
+  let filePath = null;
+  if (fs.existsSync(settingsFile)) filePath = settingsFile;
+  else if (fs.existsSync(settingsTxtFile)) filePath = settingsTxtFile;
+  
+  // If no settings file exists anywhere on startup, automatically generate a default one
+  if (!filePath) {
+    filePath = settingsFile;
+    if (!fs.existsSync(assetsDir)) {
+      try {
+        fs.mkdirSync(assetsDir, { recursive: true });
+      } catch (e) {
+        console.warn("Could not create assets directory:", e);
+      }
+    }
+    try {
+      const defaultContent = `width=350
+height=350
+scale=1.0
+bobbing=true
+spinX=false
+spinY=false
+spinZ=false
+speedX=1.0
+speedY=1.0
+speedZ=1.0
+gpuOptimize=true
+mouseOptimize=true
+settingsLeft=false`;
+      fs.writeFileSync(filePath, defaultContent, 'utf8');
+      console.log('Created default settings file at:', filePath);
+    } catch (e) {
+      console.error('Error creating default settings file:', e);
+    }
+  }
+  
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      const data = fs.readFileSync(filePath, 'utf8');
+      const lines = data.split('\n');
+      lines.forEach(line => {
+        const parts = line.split('=');
+        if (parts.length === 2) {
+          const key = parts[0].trim();
+          const val = parts[1].trim();
+          if (key === 'width') currentSettings.width = parseInt(val, 10) || 350;
+          if (key === 'height') currentSettings.height = parseInt(val, 10) || 350;
+          if (key === 'scale') currentSettings.scale = parseFloat(val) || 1.0;
+          if (key === 'bobbing') currentSettings.bobbing = (val !== 'false');
+          if (key === 'spinX') currentSettings.spinX = (val === 'true');
+          if (key === 'spinY') currentSettings.spinY = (val === 'true');
+          if (key === 'spinZ') currentSettings.spinZ = (val === 'true');
+          if (key === 'speedX') currentSettings.speedX = parseFloat(val) || 1.0;
+          if (key === 'speedY') currentSettings.speedY = parseFloat(val) || 1.0;
+          if (key === 'speedZ') currentSettings.speedZ = parseFloat(val) || 1.0;
+          if (key === 'gpuOptimize') currentSettings.gpuOptimize = (val !== 'false');
+          if (key === 'mouseOptimize') currentSettings.mouseOptimize = (val !== 'false');
+          if (key === 'settingsLeft') currentSettings.settingsLeft = (val === 'true');
+          if (key === 'lockPosition') currentSettings.lockPosition = (val === 'true');
+          if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
+        }
+      });
+      return true;
+    } catch (e) {
+      console.error('Error reading settings file:', e);
+    }
+  }
+  return false;
+}
+
+function saveSettingsFile() {
+  const assetsDir = getAssetsPath();
+  const settingsFile = path.join(assetsDir, 'settings');
+  const settingsTxtFile = path.join(assetsDir, 'settings.txt');
+  const filePath = fs.existsSync(settingsTxtFile) ? settingsTxtFile : settingsFile;
+  
+  const content = `width=${currentSettings.width}
+height=${currentSettings.height}
+scale=${currentSettings.scale}
+bobbing=${currentSettings.bobbing}
+spinX=${currentSettings.spinX}
+spinY=${currentSettings.spinY}
+spinZ=${currentSettings.spinZ}
+speedX=${currentSettings.speedX}
+speedY=${currentSettings.speedY}
+speedZ=${currentSettings.speedZ}
+gpuOptimize=${currentSettings.gpuOptimize}
+mouseOptimize=${currentSettings.mouseOptimize}
+settingsLeft=${currentSettings.settingsLeft}
+lockPosition=${currentSettings.lockPosition}
+activeModel=${currentSettings.activeModel}`;
+
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+    console.log('Saved settings to file:', filePath);
+  } catch (e) {
+    console.error('Error writing settings file:', e);
+  }
+}
+
+function setupSettingsUI() {
+  const gearBtn = document.getElementById('settings-btn');
+  const panel = document.getElementById('settings-panel');
+  const widthSlider = document.getElementById('win-width');
+  const heightSlider = document.getElementById('win-height');
+  const scaleSlider = document.getElementById('model-scale');
+  const bobbingCheck = document.getElementById('model-bobbing');
+  
+  const spinXCheck = document.getElementById('spin-x');
+  const spinYCheck = document.getElementById('spin-y');
+  const spinZCheck = document.getElementById('spin-z');
+  
+  const speedXSlider = document.getElementById('speed-x');
+  const speedYSlider = document.getElementById('speed-y');
+  const speedZSlider = document.getElementById('speed-z');
+  
+  const gpuOptimizeCheck = document.getElementById('gpu-optimize');
+  const mouseOptimizeCheck = document.getElementById('mouse-optimize');
+  const settingsLeftCheck = document.getElementById('settings-left');
+  const lockPositionCheck = document.getElementById('lock-position');
+  const modelSelect = document.getElementById('model-select');
+  
+  const valWidth = document.getElementById('val-width');
+  const valHeight = document.getElementById('val-height');
+  const valScale = document.getElementById('val-scale');
+  
+  const valSpeedX = document.getElementById('val-speed-x');
+  const valSpeedY = document.getElementById('val-speed-y');
+  const valSpeedZ = document.getElementById('val-speed-z');
+
+  // Make gear button visible
+  gearBtn.style.display = 'flex';
+
+  // Configure slider limits dynamically based on current screen size
+  widthSlider.max = window.screen.width;
+  heightSlider.max = window.screen.height;
+
+  // Function to populate model select dropdown options
+  const populateModelDropdown = () => {
+    scanForModels();
+    modelSelect.innerHTML = '<option value="procedural">Procedural Mascot (Pink Bunny)</option>';
+    discoveredModels.forEach(modelFile => {
+      const option = document.createElement('option');
+      option.value = modelFile;
+      option.textContent = modelFile;
+      modelSelect.appendChild(option);
+    });
+  };
+
+  populateModelDropdown();
+
+  // Sync sliders UI with the saved settings
+  const syncSlidersUI = () => {
+    widthSlider.value = currentSettings.width;
+    heightSlider.value = currentSettings.height;
+    scaleSlider.value = currentSettings.scale;
+    bobbingCheck.checked = currentSettings.bobbing;
+    
+    spinXCheck.checked = currentSettings.spinX;
+    spinYCheck.checked = currentSettings.spinY;
+    spinZCheck.checked = currentSettings.spinZ;
+
+    speedXSlider.value = currentSettings.speedX;
+    speedYSlider.value = currentSettings.speedY;
+    speedZSlider.value = currentSettings.speedZ;
+    
+    gpuOptimizeCheck.checked = currentSettings.gpuOptimize;
+    mouseOptimizeCheck.checked = currentSettings.mouseOptimize;
+    settingsLeftCheck.checked = currentSettings.settingsLeft;
+    lockPositionCheck.checked = currentSettings.lockPosition;
+    modelSelect.value = currentSettings.activeModel;
+
+    valWidth.innerText = currentSettings.width;
+    valHeight.innerText = currentSettings.height;
+    valScale.innerText = currentSettings.scale.toFixed(2);
+    
+    valSpeedX.innerText = currentSettings.speedX.toFixed(1);
+    valSpeedY.innerText = currentSettings.speedY.toFixed(1);
+    valSpeedZ.innerText = currentSettings.speedZ.toFixed(1);
+  };
+
+  syncSlidersUI();
+
+  // Listeners that only update the numerical labels live (does not resize window yet)
+  widthSlider.addEventListener('input', () => {
+    valWidth.innerText = widthSlider.value;
+  });
+  heightSlider.addEventListener('input', () => {
+    valHeight.innerText = heightSlider.value;
+  });
+  scaleSlider.addEventListener('input', () => {
+    valScale.innerText = parseFloat(scaleSlider.value).toFixed(2);
+  });
+  speedXSlider.addEventListener('input', () => {
+    valSpeedX.innerText = parseFloat(speedXSlider.value).toFixed(1);
+  });
+  speedYSlider.addEventListener('input', () => {
+    valSpeedY.innerText = parseFloat(speedYSlider.value).toFixed(1);
+  });
+  speedZSlider.addEventListener('input', () => {
+    valSpeedZ.innerText = parseFloat(speedZSlider.value).toFixed(1);
+  });
+
+  // Toggle panel controls (expand or close) to prevent locked window loops
+  gearBtn.addEventListener('click', () => {
+    if (isSettingsOpen) {
+      syncSlidersUI();
+      closeSettings();
+    } else {
+      isSettingsOpen = true;
+      populateModelDropdown();
+      syncSlidersUI(); // Ensure sliders match actual current saved settings
+      panel.classList.remove('hidden');
+      ipcRenderer.send('set-ignore-mouse', false);
+    }
+  });
+
+  const closeSettings = () => {
+    isSettingsOpen = false;
+    panel.classList.add('hidden');
+    ipcRenderer.send('set-ignore-mouse', true);
+  };
+
+  // Revert back to original saved settings if closed without saving
+  document.getElementById('close-btn').addEventListener('click', () => {
+    syncSlidersUI();
+    closeSettings();
+  });
+
+  // Apply changes only when user clicks "Save Settings"
+  document.getElementById('save-btn').addEventListener('click', () => {
+    // 1. Update saved settings state
+    currentSettings.width = parseInt(widthSlider.value, 10);
+    currentSettings.height = parseInt(heightSlider.value, 10);
+    currentSettings.scale = parseFloat(scaleSlider.value);
+    currentSettings.bobbing = bobbingCheck.checked;
+    
+    currentSettings.spinX = spinXCheck.checked;
+    currentSettings.spinY = spinYCheck.checked;
+    currentSettings.spinZ = spinZCheck.checked;
+    
+    currentSettings.speedX = parseFloat(speedXSlider.value);
+    currentSettings.speedY = parseFloat(speedYSlider.value);
+    currentSettings.speedZ = parseFloat(speedZSlider.value);
+    
+    currentSettings.gpuOptimize = gpuOptimizeCheck.checked;
+    currentSettings.mouseOptimize = mouseOptimizeCheck.checked;
+    currentSettings.settingsLeft = settingsLeftCheck.checked;
+    currentSettings.lockPosition = lockPositionCheck.checked;
+
+    const oldModel = currentSettings.activeModel;
+    const newModel = modelSelect.value;
+    const modelChanged = (oldModel !== newModel);
+    currentSettings.activeModel = newModel;
+
+    // 2. Save settings to local configuration file
+    saveSettingsFile();
+
+    // Handle model load when changed
+    if (modelChanged) {
+      if (mixer) {
+        mixer.stopAllAction();
+        mixer = null;
+      }
+      if (characterGroup) {
+        scene.remove(characterGroup);
+      }
+      customModelLoaded = false;
+      
+      if (newModel === 'procedural') {
+        fallbackToProcedural();
+      } else {
+        const assetsDir = getAssetsPath();
+        const fullPath = path.join(assetsDir, newModel);
+        console.log('Swapping active mascot model to:', fullPath);
+        loadCustomModel(fullPath);
+      }
+    }
+
+    // Apply position shift to the gear button
+    updateGearPosition();
+
+    // 3. Apply changes to WebGL viewport size and camera aspect
+    camera.aspect = currentSettings.width / currentSettings.height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(currentSettings.width, currentSettings.height);
+
+    // 4. Update character scale
+    if (characterGroup) {
+      characterGroup.scale.set(currentSettings.scale, currentSettings.scale, currentSettings.scale);
+      
+      // Update camera distance Z for custom models so they still fit nicely in the resized window
+      if (customModelLoaded) {
+        // Query the loaded model's size
+        const innerModel = characterGroup.children[0];
+        if (innerModel) {
+          const box = new THREE.Box3().setFromObject(innerModel);
+          const size = box.getSize(new THREE.Vector3());
+          
+          const padding = 1.35;
+          const visibleHeight = size.y * currentSettings.scale * padding;
+          const zPos = visibleHeight / (2 * Math.tan((camera.fov * Math.PI) / 360));
+          camera.position.set(0, 0, zPos + ((size.z * currentSettings.scale) / 2));
+        }
+      }
+    }
+
+    // 5. Apply the window resize to the Electron container
+    ipcRenderer.send('resize-window', { width: currentSettings.width, height: currentSettings.height });
+
+    closeSettings();
+  });
+
+  // Hover overrides to prevent mouse click-through when interacting with setting controls
+  const disableClickThrough = () => {
+    ipcRenderer.send('set-ignore-mouse', false);
+  };
+
+  gearBtn.addEventListener('mouseenter', disableClickThrough);
+  panel.addEventListener('mouseenter', disableClickThrough);
+}
+
+const idleThoughts = [
+  "Is it time for coffee yet? ☕",
+  "Just floating around... ☁️",
+  "You're doing amazing! Keep it up! ✨",
+  "I love floating here with you! 😊",
+  "Need a break soon? 🧘",
+  "What a beautiful day! 🌸",
+  "La la la~ 🎶",
+  "Let's stay focused! 💻"
+];
+
+const breakReminders = [
+  "Time for a quick water break! 💧 Stay hydrated!",
+  "Posture check! Roll your shoulders and sit up straight! 🧘",
+  "Give your eyes a 20-second break! Look 20 feet away! 👀",
+  "Let's stand up and stretch for a minute! 🤸"
+];
+
+function checkIdleThoughts(now) {
+  if (now - lastIdleThoughtTime > 75000) {
+    lastIdleThoughtTime = now;
+    if (!isSettingsOpen && animationState.type !== 'interact') {
+      const thought = idleThoughts[Math.floor(Math.random() * idleThoughts.length)];
+      showSpeechBubble(thought, 4500);
+    }
+  }
+}
+
+function checkBreakReminders(now) {
+  if (now - lastBreakReminderTime > 1200 * 1000) {
+    lastBreakReminderTime = now;
+    if (!isSettingsOpen && animationState.type !== 'interact') {
+      const reminder = breakReminders[Math.floor(Math.random() * breakReminders.length)];
+      showSpeechBubble(reminder, 7000);
+    }
+  }
+}
+
 const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
 
+  const delta = clock.getDelta();
   const elapsed = clock.getElapsedTime();
   const now = Date.now();
+
+  checkIdleThoughts(now);
+  checkBreakReminders(now);
+
+  // Update skeletal animation if active
+  if (mixer) {
+    mixer.update(delta);
+  }
+
+  // Handle continuous axis spinning if enabled (applies to innerModelGroup)
+  if (innerModelGroup) {
+    if (currentSettings.spinX) {
+      innerModelGroup.rotation.x += delta * currentSettings.speedX;
+    } else {
+      innerModelGroup.rotation.x = 0;
+    }
+    if (currentSettings.spinY) {
+      innerModelGroup.rotation.y += delta * currentSettings.speedY;
+    } else {
+      innerModelGroup.rotation.y = 0;
+    }
+    if (currentSettings.spinZ) {
+      innerModelGroup.rotation.z += delta * currentSettings.speedZ;
+    } else {
+      innerModelGroup.rotation.z = 0;
+    }
+  }
 
   if (animationState.type === 'interact') {
     const progress = (now - animationState.startTime) / animationState.duration;
@@ -308,48 +1036,51 @@ function animate() {
       animationState.type = 'idle';
       characterGroup.position.set(0, 0, 0);
       characterGroup.rotation.set(0.08, 0, 0);
-      characterGroup.scale.set(1, 1, 1);
+      const targetScale = hasSettingsFile ? currentSettings.scale : 1.0;
+      characterGroup.scale.set(targetScale, targetScale, targetScale);
     } else {
       // Interaction Animation: High Jump & 360 Spin
-      // Jump height follows a sine curve arching up then landing
       const height = Math.sin(progress * Math.PI) * 1.3;
       characterGroup.position.y = height;
 
       // 360-degree spin
       characterGroup.rotation.y = progress * Math.PI * 2;
 
-      // Squash and stretch transitions
+      // Squash and stretch transitions relative to base scale
+      const baseScale = hasSettingsFile ? currentSettings.scale : 1.0;
       if (progress < 0.2) {
-        // Squash down preparing for jump
-        const factor = progress / 0.2;
-        characterGroup.scale.set(1.15, 0.8, 1.15);
+        characterGroup.scale.set(baseScale * 1.15, baseScale * 0.8, baseScale * 1.15);
       } else if (progress < 0.8) {
-        // Stretch in mid-air
-        characterGroup.scale.set(0.9, 1.2, 0.9);
+        characterGroup.scale.set(baseScale * 0.9, baseScale * 1.2, baseScale * 0.9);
       } else {
-        // Land with squash, scaling back up to normal
         const factor = (progress - 0.8) / 0.2;
         const squashY = 0.75 + (factor * 0.25);
         const stretchXZ = 1.2 - (factor * 0.2);
-        characterGroup.scale.set(stretchXZ, squashY, stretchXZ);
+        characterGroup.scale.set(baseScale * stretchXZ, baseScale * squashY, baseScale * stretchXZ);
       }
     }
   } else {
-    // --- Idle Animation (Breathing Squash & Bobbing) ---
-    // Smooth breathing (vertical scale oscillates)
-    const breatheSpeed = 2.5;
-    const breatheFactor = Math.sin(elapsed * breatheSpeed);
+    // --- Idle Animation ---
+    if (!customModelLoaded) {
+      // Smooth breathing for procedural mascot relative to base scale
+      const baseScale = hasSettingsFile ? currentSettings.scale : 1.0;
+      const breatheSpeed = 2.5;
+      const breatheFactor = Math.sin(elapsed * breatheSpeed);
+      characterGroup.scale.y = baseScale * (1.0 + breatheFactor * 0.04);
+      characterGroup.scale.x = baseScale * (1.0 - breatheFactor * 0.02);
+      characterGroup.scale.z = baseScale * (1.0 - breatheFactor * 0.02);
+    }
 
-    characterGroup.scale.y = 1.0 + breatheFactor * 0.04;
-    characterGroup.scale.x = 1.0 - breatheFactor * 0.02;
-    characterGroup.scale.z = 1.0 - breatheFactor * 0.02;
+    // Smooth floating/bobbing up and down (applies to both custom and procedural if enabled)
+    if (currentSettings.bobbing) {
+      characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12;
+    } else {
+      characterGroup.position.y = 0;
+    }
 
-    // Smooth floating/bobbing up and down
-    characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12;
-
-    // Subtle side-to-side wobbling
+    // Subtle looking around (applies to both)
     characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
-    characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04; // Looking around slightly
+    characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
   }
 
   renderer.render(scene, camera);

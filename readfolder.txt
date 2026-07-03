@@ -1,0 +1,130 @@
+DESKTOP PET MASCOT - PROJECT DIRECTORY AND FILE STRUCTURE
+
+This document explains the purpose and role of every folder and file in this project.
+
+================================================================================
+📁 DIRECTORY TREE
+================================================================================
+
+desktop-pet/
+│
+├── assets/                       # Development assets folder for 3D model drops
+│   └── settings                  # Settings config text file (enables panel, width, height, scale, bobbing, spins, speed ranges)
+│
+├── code/                         # pristine backup clones of core source files
+│   ├── index.html
+│   ├── main.js
+│   ├── package.json
+│   ├── README.md
+│   ├── renderer.js
+│   └── style.css
+│
+├── DesktopPet-win32-x64/         # Standalone compiled executable folder for Windows
+│   ├── DesktopPet.exe            # Launch program (run this directly)
+│   ├── assets/                   # Production assets folder for custom 3D models
+│   │   └── settings              # Production settings configuration file (auto-generated if missing)
+│   └── ... (Electron binaries and dependency frameworks)
+│
+├── node_modules/                 # External node dependencies (Electron, Three.js)
+│
+├── index.html                    # Webpage wrapper hosting the WebGL canvas, gear toggles, and axis sliders
+├── main.js                       # Electron main process (Windows manager & resizing listener)
+├── renderer.js                   # WebGL render loops, click-through, settings sliders, and spinning loops
+├── style.css                     # Window transparency and scrollable settings card templates
+├── package.json                  # Node configuration, scripts, and dependencies
+├── package-lock.json             # Locked version tracking of Node packages
+├── README.md                     # Polished setup and customization documentation
+├── readme_commerce.txt           # Outline of marketing and sales touchpoints
+├── planT001.txt                  # Plan blueprint on customized single-animation 3D models
+├── planT002.txt                  # Performance plan for dedicated GPU acceleration overrides
+├── planT003.txt                  # Interaction plan for hover event lag optimizations
+└── readfolder.txt                # This directory guide (updated)
+
+================================================================================
+📄 FILE AND FOLDER ROLES
+================================================================================
+
+--------------------------------------------------------------------------------
+1. CORE SOURCE FILES
+--------------------------------------------------------------------------------
+* main.js
+  - Purpose: The Electron main process controller.
+  - Role: Interacts with the Windows Operating System. It creates the borderless,
+    transparent window, forces it to stay "always on top", places it above the
+    taskbar at the bottom-right screen corner, and handles OS-level events.
+    Now includes a `resize-window` event listener that adjusts window bounds
+    while maintaining the bottom-right coordinate anchor.
+
+* renderer.js
+  - Purpose: The frontend browser logic processor.
+  - Role: Initializes the WebGL 3D rendering context (Three.js), scene, lights,
+    and cameras. It handles the continuous animation render loop (bobbing and
+    jumping), monitors mouse movements to check if they overlap the character
+    (Raycasting) or settings controls to bypass click-through rules. It reads and
+    writes configurations (spins, speeds including reverse directions, sizes, scales)
+    to the settings file and implements continuous rotation loops inside the render sequence.
+    Automatically generates a default settings file on launch if not present.
+
+* index.html
+  - Purpose: Document viewport container.
+  - Role: Contains the HTML layout where the Three.js WebGL canvas and glassmorphic
+    Settings Panel markup (sliders, checkbox, save buttons, spinning controls) are
+    mounted. It defines the native "importmap" script to resolve bare imports (like Three.js).
+
+* style.css
+  - Purpose: Style sheet.
+  - Role: Enforces absolute background transparency across the HTML canvas,
+    disables default image dragging, and implements glassmorphic visual parameters
+    (blur, dark theme, colors, hover fades, layout grids, slider margins) for the
+    Settings panel, gear icon, and scrolling list sections.
+
+--------------------------------------------------------------------------------
+2. CONFIGURATION AND PACKAGING
+--------------------------------------------------------------------------------
+* package.json
+  - Purpose: Project dependencies manifest.
+  - Role: Defines npm run configurations (npm start and npm run build).
+
+* package-lock.json
+  - Purpose: Dependency lock file.
+  - Role: Tracks exact sub-dependency versions installed by npm.
+
+--------------------------------------------------------------------------------
+3. DIRECTORIES
+--------------------------------------------------------------------------------
+* assets/
+  - Purpose: Zero-code custom asset directory.
+  - Role: In dev mode, place a `.glb` or `.gltf` 3D model here to replace the pink
+    bunny mascot. Contains the `settings` config file. If this file is present,
+    it unlocks the in-app interactive settings cog.
+
+* DesktopPet-win32-x64/
+  - Purpose: Compiled standalone build directory.
+  - Role: Contains the bundled app ready for distribution. Inside, users can run
+    `DesktopPet.exe` without having Node.js or npm installed. Contains its own
+    `assets/settings` file to toggle settings panel controls in production.
+
+* code/
+  - Purpose: Backup clone folder.
+  - Role: Stores pristine duplicates of core code files, isolated from build
+    remnants and heavy `node_modules` folders.
+
+* node_modules/
+  - Purpose: Local packages folder.
+  - Role: Stores the raw code files downloaded by npm for dependencies.
+
+--------------------------------------------------------------------------------
+4. DOCUMENTATION
+--------------------------------------------------------------------------------
+* README.md
+  - Purpose: User setup and usage documentation.
+  - Role: Detailed guidance on run options, interactive controls, and model loading.
+    Updated to cover settings activation and resizing.
+
+* readme_commerce.txt
+  - Purpose: Monetization documentation.
+  - Role: Lists sales channels, digital storefronts, and commercialization models.
+
+* readfolder.txt
+  - Purpose: Structural documentation.
+  - Role: Explains directory tree structure and component roles (this file).

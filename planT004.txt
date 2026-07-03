@@ -1,0 +1,123 @@
+================================================================================
+PLAN T004: DESIRABLE DESKTOP PET FEATURES & ALTERNATIVES
+================================================================================
+
+This plan outlines the top 5 highly requested features for desktop pet applications
+along with 3 technical implementation alternatives for each.
+
+--------------------------------------------------------------------------------
+1. SPEECH BUBBLES AND DIALOGUE SYSTEM (COMMUNICATION & PERSONALITY)
+--------------------------------------------------------------------------------
+Users want the pet to feel alive by communicating thoughts, reacting to clicks,
+or greeting them.
+
+* Alternative 1: Floating glassmorphic speech bubble above the pet
+  - How it works: Add an HTML speech bubble container in index.html, styled with
+    glassmorphic effects in CSS. In renderer.js, show/hide the bubble and update
+    its text based on triggers (idle quotes, click reactions, startup greetings).
+  - Pros: High visual polish, extremely easy to read, uses standard CSS transitions.
+  - Cons: Requires HTML overlays and careful positioning relative to the pet.
+
+* Alternative 2: HTML5 Notification API messages
+  - How it works: Trigger standard OS-level system notifications via standard Web
+    APIs when the pet wants to say something.
+  - Pros: Works even if the pet is hidden or window is minimized.
+  - Cons: Disruptive to user workflow, lacks cute aesthetic integration.
+
+* Alternative 3: 3D Text Geometry in WebGL scene
+  - How it works: Render text directly in the Three.js 3D space using sprite maps or
+    3D mesh text floating above the character.
+  - Pros: Fits perfectly within the 3D scene; scales and rotates with the model.
+  - Cons: Text can become hard to read depending on scaling/rotation; complex rendering.
+
+--------------------------------------------------------------------------------
+2. PRODUCTIVITY UTILITIES & REMINDERS (POMODORO & HYDRATION TIMERS)
+--------------------------------------------------------------------------------
+Integrating utility features allows the pet to act as a wellness companion.
+
+* Alternative 1: Active Hydration & Stretch break timers
+  - How it works: Background timer in renderer.js. When the time is up, the pet
+    displays a speech bubble reminder (e.g. "Time to stretch! 🌸") and triggers a
+    special physical reaction (like a wiggle or a spin).
+  - Pros: Highly useful wellness utility, very cute integration.
+  - Cons: Requires persistent timers.
+
+* Alternative 2: Built-in Pomodoro timer countdown overlay
+  - How it works: A visible timer bar or countdown timer next to the pet. Toggles
+    between Work and Break states with play/pause buttons in the Settings.
+  - Pros: Visual aid for work focus sessions.
+  - Cons: Visual noise if the user just wants a clean companion.
+
+* Alternative 3: Floating Todo Checklist Drawer
+  - How it works: Add a small checklist overlay that pops out of the side of the
+    window, allowing users to type and cross off simple tasks.
+  - Pros: High utility value.
+  - Cons: Heavy UI footprints on a compact screen layout.
+
+--------------------------------------------------------------------------------
+3. ACCESSORY SYSTEM (HATS, GLASSES, SKINS)
+--------------------------------------------------------------------------------
+Allowing users to customize the visual appearance of their pets.
+
+* Alternative 1: 3D Bounding-Box Overlay attachments
+  - How it works: Preload a set of simple accessory meshes (e.g. hats, sunglasses)
+    and attach them programmatically to the pet's head joint or top pivot.
+  - Pros: Looks fully three-dimensional, moves with the character.
+  - Cons: Model-specific bones/joints vary, making positioning on custom models hard.
+
+* Alternative 2: Transparent 2D CSS overlays
+  - How it works: Overlay a transparent absolute-positioned div containing image
+    accessories directly over the canvas viewport.
+  - Pros: Works universally on any model loaded.
+  - Cons: Accessories won't rotate or move in 3D perspective with the character.
+
+* Alternative 3: Shader-based color skin modifications
+  - How it works: Allow the user to select colors from a color picker, applying them
+    directly to the procedural model's materials or GLTF material colors.
+  - Pros: Fully customizable colors for the procedural mascot.
+  - Cons: Hard to apply cleanly to pre-textured complex GLB models.
+
+--------------------------------------------------------------------------------
+4. ROAMING & EDGE WALKING BEHAVIOR (DESKTOP MOVEMENT)
+--------------------------------------------------------------------------------
+Letting the pet walk around the taskbar or screen edges instead of staying in one place.
+
+* Alternative 1: Taskbar edge walking pathing
+  - How it works: Use a state machine in main.js to walk the Electron window left
+    and right along the bottom taskbar boundary, playing a walk cycle animation.
+  - Pros: Extremely dynamic, nostalgic desktop toy behavior.
+  - Cons: Can cover up taskbar icons, window boundary calculations can get messy.
+
+* Alternative 2: Gravity drop and throw physics
+  - How it works: When dragging is released, apply vertical velocity physics so
+    the pet "falls" back down to the taskbar.
+  - Pros: Fun interactive physics feedback.
+  - Cons: Window bounds are fixed, so it can only fall inside its own window frame.
+
+* Alternative 3: Cursor chase / glancing focus
+  - How it works: Make the pet look/lean towards the mouse cursor position when
+    the mouse is outside the window.
+  - Pros: Low overhead, makes the pet feel aware of the user.
+  - Cons: Very subtle.
+
+--------------------------------------------------------------------------------
+5. STATUS & CARE METERS (FEEDING, PETTING, MOOD)
+--------------------------------------------------------------------------------
+Giving the user a way to take care of the pet to build attachment.
+
+* Alternative 1: Hover-based petting action and mood bar
+  - How it works: Repeatedly hovering/moving the cursor over the pet triggers a
+    hearts particle effect and increases a "Petting Meter" or "Happiness Meter".
+  - Pros: High user engagement, simple mouse listener hookups.
+  - Cons: Needs persistent storage to save happiness levels.
+
+* Alternative 2: Drag-and-drop feeding mechanics
+  - How it works: Clicking an food icon spawns a food mesh, which falls down.
+    The pet tilts/moves to "eat" it, triggering a chewing animation.
+  - Pros: Entertaining, interactive.
+  - Cons: Requires complex geometry collisions.
+
+* Alternative 3: Level-up evolution progression
+  - How it works: Accumulate points over time to grow or change the pet's scale/color.
+  - Pros: Long term retention.
+  - Cons: High effort to design multiple visual states.

@@ -1,0 +1,79 @@
+================================================================================
+PLAN T001: INTEGRATION AND CUSTOMIZATION OF SINGLE-ANIMATION 3D MASCOTS
+================================================================================
+
+This plan outlines the technical background, current mechanics, and future roadmap
+for hosting 3D models with a single animation (e.g. customized Pokémon idle/walk cycles)
+in the transparent desktop mascot application.
+
+--------------------------------------------------------------------------------
+1. UNDERSTANDING 3D ANIME & GAME ASSET ANIMATION (GLB/GLTF)
+--------------------------------------------------------------------------------
+Most custom 3D models downloaded from asset stores (e.g., Sketchfab, models-resource)
+contain skeletal animation data.
+* Skeletal Rigging: The model has a virtual "skeleton" (bones).
+* Keyframes: Animation files store rotation/position coordinates for each bone
+  over a timeline.
+* Tracks/Clips: A single file (.glb) can store one or more of these animation
+  timelines.
+  - A "single-animation model" usually has only one track embedded, commonly
+    labeled "idle", "walk", "ambient", or "Default Take".
+
+--------------------------------------------------------------------------------
+2. CURRENT APPLICATION MECHANICS
+--------------------------------------------------------------------------------
+The program currently includes an automated animation engine:
+1. Load Phase: GLTFLoader parses the `.glb` or `.gltf` asset from the `assets/` folder.
+2. Discovery Phase: Checks if the loaded asset contains animations:
+   `if (gltf.animations && gltf.animations.length > 0)`
+3. Mixer Binding: Spawns a `THREE.AnimationMixer(model)`. The mixer is the clock-based
+   player for the skeleton.
+4. Action Queueing: Grabs the very first clip at index 0 and sets it to play:
+   `const action = mixer.clipAction(gltf.animations[0])`
+   `action.play()`
+5. Frame updates: In the render loop, the mixer is updated by time ticks:
+   `mixer.update(delta)`. Swapping the clock delta calls ensures this tick rate
+   is exact (e.g. 60 ticks per second), creating a smooth loop.
+
+--------------------------------------------------------------------------------
+3. USER GUIDE: PREPARING YOUR CUSTOM 3D MODEL
+--------------------------------------------------------------------------------
+If you want to create or download a model to work with the pet companion app:
+1. Export Format: Always use `.glb` (GL Binary) as it bundles textures, geometries,
+   materials, rigs, and animations into a single file.
+2. Blender Export Settings:
+   - File ➔ Export ➔ glTF 2.0 (.glb/.gltf)
+   - Expand the "Animation" drawer in the export dialog.
+   - Ensure "Animation" is CHECKED.
+   - Ensure "Limit to Selected Objects" is checked if you only want to export the rig.
+3. First-Track Rule: The app plays the first animation list item (`animations[0]`).
+   Ensure your main cycle (e.g. breathing/floating) is sorted or named first.
+
+--------------------------------------------------------------------------------
+4. PROPOSED NEXT-STEP FEATURES FOR DEVELOPMENT
+--------------------------------------------------------------------------------
+To make single-animation characters feel much more interactive and customizable,
+we can build the following features next:
+
+A. In-App Animation Speed Control
+   - Goal: Add an "Animation Speed" slider to the Settings Panel.
+   - Range: `0.0x` (paused) to `3.0x` (triple speed).
+   - Code: `mixer.timeScale = currentSettings.animSpeed`
+
+B. Animation Play / Pause Toggle
+   - Goal: Add a checkbox to toggle state between playing and frozen.
+   - Code: `action.paused = !currentSettings.playAnim`
+
+C. Seamless Jump blending
+   - Goal: Blend the skeletal animation with the desktop jump click event.
+   - Currently: Click triggers a physical jump/spin of the whole container.
+   - Future: Make the skeleton play a "reaction" clip (if available) before returning
+     to the main idle animation.
+
+--------------------------------------------------------------------------------
+5. MILESTONE PLAN FOR IMPLEMENTATION
+--------------------------------------------------------------------------------
+* Milestone 1: Read this plan (T001) to understand 3D asset workflows.
+* Milestone 2: Verify custom GLB files auto-play their embedded loops when dropped
+  into the `assets/` directory.
+* Milestone 3: Extend settings UI to support custom animation speed scales.

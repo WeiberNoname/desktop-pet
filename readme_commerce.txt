@@ -9,9 +9,10 @@ This document outlines direct venues and methods where this interactive 3D deskt
    - Epic Games Store: Distribution as a casual utility/software application.
 
 2. IN-APP MICRO-TRANSACTIONS (ASSET CATALOG SALES)
-   - 3D Model Skins: Selling alternative character models (different animals, fantasy creatures, outfits).
-   - Animation Packs: Selling additional motion sets (e.g., custom dances, reactions, idle states).
-   - Theme Customizations: Selling custom textures, hats, accessories, or matching transparent taskbar overlays.
+   - 3D Model Skins: Selling alternative character models (different animals, fantasy creatures, outfits) optimized for the zero-code drag-and-drop installer.
+   - Animation Packs: Selling additional motion sets (e.g., custom dances, reactions, idle states) embedded in custom GLB models.
+   - Theme Customizations: Selling customized settings profiles (window configurations, specific spin velocities, scaling) matching customized 3D character drops.
+   - Accessory Drops: Selling hats, wings, or accessories modeled directly onto character meshes.
 
 3. SPONSORSHIPS, IP COLLABORATIONS, AND MERCHANDISING
    - VTuber / Streamer Branded Mascot: Creating custom interactive 3D pets matching the branding of Twitch/YouTube creators to sell to their fanbases.

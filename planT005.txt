@@ -1,0 +1,128 @@
+================================================================================
+PLAN T005: DESKTOP PET UX BOTTLENECKS & REMEDIES
+================================================================================
+
+This plan details the top 5 bad user experience (UX) bottlenecks identified in the
+desktop mascot companion app and provides 3 technical remedies for each.
+
+--------------------------------------------------------------------------------
+1. ACCIDENTAL DRAGGING DURING INTERACTION (DRAG VS. CLICK INTRUSION)
+--------------------------------------------------------------------------------
+Users accidentally reposition the window when trying to click the mascot for brief
+reaction animations, or they cannot lock the mascot in place.
+
+* Alternative 1: Lock Position switch in settings
+  - How it works: Add a checkbox labeled "Lock Mascot Position" in the Settings.
+    If checked, we set currentSettings.lockPosition = true, which disables dragging
+    window listeners entirely.
+  - Pros: High-demand feature, simple checkbox toggle, 100% reliable.
+  - Cons: None.
+
+* Alternative 2: Modifier key requirement for window dragging
+  - How it works: Only trigger window movement coordinates tracking when mouse dragging
+    is combined with holding the Shift or Ctrl key.
+  - Pros: Keeps mouse clicks free for interaction without needing setting toggles.
+  - Cons: Non-obvious control mechanism (requires documentation).
+
+* Alternative 3: Explicit handle element for dragging
+  - How it works: Render a small anchor or handle element (like a pet lead or stand)
+    which is the only region that allows dragging.
+  - Pros: Clear boundary between clicking/dragging.
+  - Cons: Adds clutter to the transparent borderless design.
+
+--------------------------------------------------------------------------------
+2. TEDIOUS SWAPPING OF CUSTOM MODELS (NO DYNAMIC ASSET SELECTOR)
+--------------------------------------------------------------------------------
+To use custom GLB models, users must manually rename their file to overwrite the active
+model in the assets folder.
+
+* Alternative 1: Scanning asset folder and adding a Dropdown Selector
+  - How it works: Scan the assets folder for all *.glb/*.gltf files via fs.readdirSync()
+    and populate a `<select>` dropdown in the Settings Panel. Selecting an item loads
+    and renders the chosen model instantly.
+  - Pros: Extremely convenient, allows keeping multiple models in assets folder,
+    no rename hacks needed.
+  - Cons: Requires handling model load errors gracefully if a chosen model is corrupt.
+
+* Alternative 2: HTML File Selector input in Settings
+  - How it works: Add a `<input type="file" accept=".glb,.gltf">` element in settings
+    to browse local storage and import/copy models to assets.
+  - Pros: Allows loading files from any directory on the PC.
+  - Cons: Security sandboxing in browsers can complicate absolute path extraction.
+
+* Alternative 3: Hotkey model cycler
+  - How it works: Implement left/right arrow buttons on the UI or keyboard listeners
+    (e.g., Tab key) to cycle through available models in the assets directory.
+  - Pros: Zero panel interface overhead.
+  - Cons: Hard to know which model is coming next; accidental triggers.
+
+--------------------------------------------------------------------------------
+3. ABRUPT ANIMATION JUMPS AND RESET SKIPS
+--------------------------------------------------------------------------------
+The mascot snaps instantly to its default height and rotation when the click
+interaction completes, causing a harsh visual glitch.
+
+* Alternative 1: Linear interpolation (Lerp) to target position
+  - How it works: In the animation frame loop, instead of setting scale and rotation
+    instantly, use linear interpolation to transition smooth variables back to defaults.
+  - Pros: Removes jarring visual pops, creating smooth visual flows.
+  - Cons: Slightly more math in the frame loops.
+
+* Alternative 2: Randomized transition frames
+  - How it works: Blend a dedicated "landing" skeleton keyframe clip before returning
+    to standard loop.
+  - Pros: High-quality skeletal realism.
+  - Cons: Requires custom models to have explicit landing animations.
+
+* Alternative 3: Fade-out/Fade-in transition
+  - How it works: Fade the character opacity to 0, reset position, and fade back to 1.
+  - Pros: Easy to code.
+  - Cons: Visually disruptive (mascot vanishes briefly).
+
+--------------------------------------------------------------------------------
+4. SETTINGS PANEL COVERING THE WHOLE MASCOT (VISUAL OBSTRUCTION)
+--------------------------------------------------------------------------------
+The settings screen blocks the user's view of the mascot, preventing them from seeing scale
+and rotation changes live while adjusting sliders.
+
+* Alternative 1: Transparent/Glassmorphic collapsible settings drawer
+  - How it works: Use CSS grids to divide the panel into a sidebar or bottom tray,
+    and make the background highly transparent with a blur backdrop.
+  - Pros: High aesthetic value, lets users watch mascot adjustments.
+  - Cons: Requires careful layout padding.
+
+* Alternative 2: Pop-out settings window
+  - How it works: Open settings inside a separate Electron BrowserWindow instance
+    so it can be moved anywhere on the screen independently from the mascot.
+  - Pros: Mascot is 100% visible.
+  - Cons: Multiple windows to manage, higher memory footprints.
+
+* Alternative 3: Hotkey toggles for scales and spins
+  - How it works: Minimize UI by mapping keyboard shortcuts (e.g. +/- for scale,
+    R for spin) instead of settings panels.
+  - Pros: Cleanest visual layout.
+  - Cons: Hard for users to remember shortcuts.
+
+--------------------------------------------------------------------------------
+5. HARDWARE RESOURCE SPIKES (CPU/GPU OVERLOAD)
+--------------------------------------------------------------------------------
+Running a WebGL context at 60+ FPS continuously on transparent windows can cause high
+GPU or battery draw on laptops.
+
+* Alternative 1: Smart FPS throttling when idle / inactive
+  - How it works: Monitor user idle times. If the user is inactive or mouse is away,
+    reduce the requestAnimationFrame rendering frequency to 30 FPS or 15 FPS.
+  - Pros: Cuts battery consumption by up to 70% during idle desktop work.
+  - Cons: Lowers pet animation smoothness temporarily.
+
+* Alternative 2: Low-performance fallback mode
+  - How it works: Add a "Low Power Mode" toggle that disables shadows, complex antialiasing,
+    and physical clay/sheen materials, falling back to simple BasicMaterial shaders.
+  - Pros: Drastic performance savings on older laptops.
+  - Cons: Mascot loses its premium glossy look.
+
+* Alternative 3: Automatically freeze rendering when window is minimized or covered
+  - How it works: Listen to OS events for when the pet window is fully occluded
+    and halt the Three.js loop completely.
+  - Pros: Perfect resource conservation.
+  - Cons: Already partially implemented by occlusion flags, but can be forced programmatically.
