@@ -1,0 +1,160 @@
+DESKTOP PET MASCOT - SEQUENTIAL EXECUTION LOGIC FLOW
+
+This document details the step-by-step sequential logic flow of the application
+from launch to user interaction and rendering.
+
+================================================================================
+STEP 1: INITIAL RUNTIME STARTUP (main.js)
+================================================================================
+1. The Windows OS launches `DesktopPet.exe` (or the developer runs `npm start`).
+2. Electron loads the main process script [main.js].
+3. Global switch config runs: `disable-backgrounding-occluded-windows` is enabled
+   to prevent Chromium from freezing animation renders when covered by other apps.
+4. Electron emits the `'ready'` event, triggering the creation of the window:
+   - Screen coordinates are queried via `screen.getPrimaryDisplay()`.
+   - Dimensions are set to 350x350, placed at the bottom-right corner, shifted
+     50px offset from the taskbar margins.
+   - The BrowserWindow is spawned with options: `transparent: true`,
+     `frame: false`, `alwaysOnTop: true`, `resizable: false`, and `hasShadow: false`.
+5. The window loads [index.html].
+6. Initial window settings: Click-through is enabled immediately by running
+   `mainWindow.setIgnoreMouseEvents(true, { forward: true })`.
+   - NOTE: `{ forward: true }` is critical. It makes clicks ignore the window (passing
+     through to background apps) but keeps forwarding mouse movement coordinates
+     to Chromium so the app knows when the mouse enters the mascot.
+
+================================================================================
+STEP 2: WINDOW LOAD & MODULE RESOLUTION (index.html & renderer.js)
+================================================================================
+1. Chromium loads the HTML document structure of [index.html].
+2. The HTML parser reads the `<script type="importmap">` tag.
+   - It registers `"three"` as a mapped module specifier pointing directly to the
+     Three.js library source module. This prevents Chromium from crashing on bare imports
+     inside Three.js extension files (like the GLTF Loader).
+3. The parser loads `<script type="module" src="renderer.js"></script>` which loads
+   the ES module [renderer.js] asynchronously.
+4. Global variables inside `renderer.js` are initialized.
+5. Node integrations are imported into the browser sandbox via `window.require()`:
+   - `ipcRenderer` (for sending messages to the main window controller)
+   - `fs` (for reading files on the local filesystem)
+   - `path` (for cross-platform filepath joins)
+   - `pathToFileURL` (for converting file paths to Chromium-friendly URL formats)
+6. Once the DOM tree is ready, the `'DOMContentLoaded'` listener fires, triggering the
+   `init()` function.
+
+================================================================================
+STEP 3: WEBGL ENGINE SETUP (init() in renderer.js)
+================================================================================
+1. The DOM container `#container` is loaded.
+2. The system runs `readSettingsFile()`:
+   - Scans the `assets/` folder for a file named `settings` or `settings.txt`.
+   - If found, it parses key-value lines (width, height, scale, bobbing, spinX/Y/Z,
+     and speedX/Y/Z) and returns `true`.
+   - The global `hasSettingsFile` flag is set to `true`.
+3. A `THREE.Scene` is instantiated.
+4. A `PerspectiveCamera` is set up.
+5. A transparent WebGL renderer is initialized:
+   `renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })`
+   - Setting clear color to transparent (alpha 0) ensures the canvas renders
+     only the 3D meshes, leaving the background fully transparent to the desktop.
+   - The canvas element is appended to the DOM.
+6. Lighting is configured and added to the scene.
+7. The app triggers `detectAndLoadAsset()` to resolve the mascot character.
+8. The app checks if `hasSettingsFile` is true, and if so, runs `setupSettingsUI()`
+   to configure the gear icon (`⚙️`) hover states and bind sliders.
+
+================================================================================
+STEP 4: ZERO-CODE ASSET SCANNING & RESOLUTION (detectAndLoadAsset())
+================================================================================
+1. `getAssetsPath()` determines the folder path (`assets/` next to `.exe` in production,
+   or `./assets/` in local development).
+2. The system checks if the directory exists (creating it if missing) and runs
+   `fs.readdirSync()`.
+3. **CASE A: No `.glb` or `.gltf` asset is present in the folder**
+   - The app calls `createMascot()` to procedurally construct the pink mascot.
+   - It wraps all geometry meshes in an `innerModelGroup` to separate active axis-spinning
+     from outer floating/interaction loops, and adds `innerModelGroup` to `characterGroup`.
+4. **CASE B: A custom `.glb` / `.gltf` asset is detected**
+   - The asset filepath is converted into a local file URL.
+   - An empty temporary `characterGroup` is created and added to the scene.
+   - `GLTFLoader` asynchronously loads the asset:
+     - **On Successful Load:**
+       - The temporary placeholder group is removed.
+       - A new `characterGroup` is created, and the loaded model is centered relative to
+         its bounding-box coordinates.
+       - A custom `innerModelGroup` is added inside `characterGroup` to host the mesh,
+         enabling independent localized rotation controls.
+       - **If settings are NOT enabled:** The model scale is set to `(1,1,1)`. The window
+         is auto-resized and the camera Z is auto-repositioned to capture the model's
+         bounds (bounded between 150px and 800px).
+       - **If settings ARE enabled:** The model scale is set to `currentSettings.scale`.
+         The WebGL viewport is updated to match `currentSettings.width` and `height`.
+         The camera Z is positioned based on the manual scale bounds.
+       - An IPC `resize-window` is fired to resize the Electron window.
+       - If skeletal animations exist, the first animation clip is played.
+
+================================================================================
+STEP 5: INTERACTION & DRAG HOOKUPS (setupInteraction() in renderer.js)
+================================================================================
+1. Global mouse listeners are bound to the window: `mousemove`, `mousedown`, `mouseup`.
+2. **Hover Hit-Testing (Raycasting & Settings Overrides):**
+   - On `mousemove` (when not dragging):
+     - Raycasting detects if the mouse cursor overlaps the 3D pet mesh.
+     - **If Raycast hits OR Settings Panel is open (`isSettingsOpen`):** Click-through is
+       disabled (`ipcRenderer.send('set-ignore-mouse', false)`), allowing hover pointers,
+       clicks on the pet, and interactions with settings buttons.
+     - **If Raycast misses AND Settings Panel is closed:** Click-through is enabled
+       (`ipcRenderer.send('set-ignore-mouse', true)`), passing mouse events through
+       transparent canvas zones to desktop files.
+3. **Window dragging:**
+   - On `mousedown` (if hovering character), `isDragging` is set to `true`.
+   - On `mousemove` (while dragging), coordinate deltas are computed, and IPC `move-window`
+     is fired. Electron moves the window position on the desktop.
+4. **Click Animation Trigger:**
+   - On `mouseup` (while dragging), if mouse moved less than 8 pixels, it registers a click,
+     triggering `triggerInteraction()` which starts the spin/jump animation.
+
+================================================================================
+STEP 6: SETTINGS PANEL CONTROLS (setupSettingsUI() in renderer.js)
+================================================================================
+1. When the gear icon `⚙️` is clicked, the settings overlay transitions to visible,
+   forcing `isSettingsOpen = true` (disabling click-through).
+2. Sliders (Width, Height, Scale, and Spin Speeds X/Y/Z) are bound to `input` event
+   listeners. As you drag the sliders:
+   - Only the numerical display labels in the UI update in real-time.
+   - Resizing and camera operations are **deferred** to prevent flashing.
+3. **Close Action:** Clicking `Close` discards changes, resets all slider and checkbox
+   values back to the last saved settings, hides the overlay, and sets `isSettingsOpen = false`.
+4. **Save Action:** Clicking `Save Settings` applies the values:
+   - Reads the slider and checkbox values and saves them to `currentSettings`.
+   - Calls `saveSettingsFile()` to write configurations back to the text file.
+   - Resizes WebGL viewports and resets camera aspect ratios.
+   - Adjusts the 3D model scale.
+   - Calls IPC `resize-window` to resize the Electron window.
+   - Closes the settings overlay panel.
+
+================================================================================
+STEP 7: FRAME LOOP RENDERING (animate() in renderer.js)
+================================================================================
+1. `requestAnimationFrame(animate)` schedules the next frame render.
+2. Time variables `elapsed` (total run time) and `delta` (frame tick interval) are computed.
+3. If an animation mixer is active, it is updated: `mixer.update(delta)`.
+4. **CONTINUOUS AXIS SPINNING:**
+   - If `innerModelGroup` is initialized:
+     - **X Spin:** If `spinX` is true, increments `innerModelGroup.rotation.x` by `delta * speedX`.
+       If false, resets rotation X to `0`.
+     - **Y Spin:** If `spinY` is true, increments `innerModelGroup.rotation.y` by `delta * speedY`.
+       If false, resets rotation Y to `0`.
+     - **Z Spin:** If `spinZ` is true, increments `innerModelGroup.rotation.z` by `delta * speedZ`.
+       If false, resets rotation Z to `0`.
+5. **ANIMATION EVALUATION (characterGroup):**
+   - **Interactive State ('interact'):** Mascot jumps, spins 360°, and applies landing squashes.
+     Upon completion, scale reverts to `currentSettings.scale` (if settings are enabled) or `1.0`.
+   - **Idle State ('idle'):**
+     - Bobbing: If `currentSettings.bobbing` is enabled, the mascot floats up/down. If disabled,
+       vertical floating is set to `0`.
+     - Wobbling: Swaying rotation Z swings side-to-side.
+     - Glancing: Glances left/right.
+     - Breathing: Applied to the procedural mascot only.
+6. `renderer.render(scene, camera)` compiles the frame, displaying WebGL graphics onto the
+   transparent Electron window frame.

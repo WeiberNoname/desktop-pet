@@ -25,3 +25,316 @@ canvas {
   background-color: transparent !important;
   display: block;
 }
+
+/* Settings Gear Icon */
+.settings-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  background: rgba(30, 30, 30, 0.4);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease, background 0.2s ease;
+  z-index: 1000;
+  outline: none;
+}
+
+.settings-btn:hover {
+  background: rgba(30, 30, 30, 0.85);
+  transform: rotate(45deg);
+}
+
+/* Show gear button when hovering the window body area */
+body:hover .settings-btn {
+  opacity: 1;
+}
+
+/* Settings Panel */
+.settings-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  background: rgba(18, 18, 18, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px;
+  color: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  overflow-y: auto;
+}
+
+.settings-panel.hidden {
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
+.settings-panel h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+  color: #ffffff;
+}
+
+.setting-item {
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setting-item label {
+  font-size: 10.5px;
+  color: #9ca3af;
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+}
+
+.setting-item input[type="range"] {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff7597;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.setting-item.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.setting-item.checkbox label {
+  font-size: 11.5px;
+  color: #d1d5db;
+  cursor: pointer;
+}
+
+.setting-item.checkbox input[type="checkbox"] {
+  accent-color: #ff7597;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+}
+
+/* Axis Spinning Subsections */
+.settings-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 8px;
+  padding-top: 6px;
+}
+
+.settings-section h4 {
+  font-size: 10.5px;
+  color: #ff7597;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.spin-controls-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spin-row input[type="checkbox"] {
+  accent-color: #ff7597;
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+}
+
+.spin-row label {
+  font-size: 11px;
+  color: #d1d5db;
+  width: 45px;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.spin-row input[type="range"] {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1.5px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.spin-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff7597;
+  cursor: pointer;
+}
+
+.spin-val {
+  font-size: 10px;
+  color: #9ca3af;
+  width: 20px;
+  text-align: right;
+}
+
+.settings-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.btn {
+  flex: 1;
+  padding: 6px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn.save {
+  background: #ff7597;
+  color: #ffffff;
+}
+
+.btn.save:hover {
+  background: #ff4d72;
+}
+
+.btn.close {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.btn.close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* Speech Bubble Container */
+.speech-bubble {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: rgba(18, 18, 18, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 117, 151, 0.4);
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+  max-width: 80%;
+  width: max-content;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  z-index: 998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.25);
+}
+
+.speech-bubble.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  pointer-events: auto;
+}
+
+.bubble-text {
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.bubble-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: rgba(18, 18, 18, 0.82);
+  border-right: 1px solid rgba(255, 117, 151, 0.4);
+  border-bottom: 1px solid rgba(255, 117, 151, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+/* Custom Dropdown Styling */
+select {
+  width: 100%;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 11.5px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+select:focus {
+  border-color: #ff7597;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+select option {
+  background: #121212;
+  color: #ffffff;
+}

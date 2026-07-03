@@ -37,9 +37,58 @@ function createWindow() {
   });
 }
 
+const fs = require('fs');
+
+// Helper to determine path to settings configuration file inside main process
+function getAssetsPath() {
+  const exeDir = path.dirname(process.execPath);
+  const packagedAssetsPath = path.join(exeDir, 'assets');
+  if (fs.existsSync(packagedAssetsPath)) return packagedAssetsPath;
+  return path.join(process.cwd(), 'assets');
+}
+
+function shouldOptimizeGPU() {
+  const assetsDir = getAssetsPath();
+  const settingsFile = path.join(assetsDir, 'settings');
+  const settingsTxtFile = path.join(assetsDir, 'settings.txt');
+  let filePath = null;
+  if (fs.existsSync(settingsFile)) filePath = settingsFile;
+  else if (fs.existsSync(settingsTxtFile)) filePath = settingsTxtFile;
+  
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      const data = fs.readFileSync(filePath, 'utf8');
+      const lines = data.split('\n');
+      let optimize = true; // Default to true if not specified
+      lines.forEach(line => {
+        const parts = line.split('=');
+        if (parts.length === 2 && parts[0].trim() === 'gpuOptimize') {
+          optimize = (parts[1].trim() !== 'false');
+        }
+      });
+      return optimize;
+    } catch (e) {
+      console.error('Error reading settings in main:', e);
+    }
+  }
+  return true; // Default to true if file missing
+}
+
 // Disable GPU occlusion tracking to prevent chromium from suspending rendering
 // when window overlaps with other apps
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows', 'true');
+
+// Conditionally append GPU optimizations based on user preference config
+if (shouldOptimizeGPU()) {
+  // Force Electron to request the high-performance dedicated GPU (discrete graphics)
+  app.commandLine.appendSwitch('force_high_performance_gpu', 'true');
+
+  // Bypass Chromium driver blocklists to ensure hardware acceleration is active
+  app.commandLine.appendSwitch('ignore-gpu-blocklist', 'true');
+}
+
+// Disable automatic DPI scaling to prevent window enlarging/shrinking when dragging across monitors
+app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
 app.on('ready', createWindow);
 
@@ -63,5 +112,23 @@ ipcMain.on('move-window', (event, delta) => {
   if (mainWindow) {
     const [x, y] = mainWindow.getPosition();
     mainWindow.setPosition(Math.round(x + delta.x), Math.round(y + delta.y));
+  }
+});
+
+// IPC handler to dynamically resize the window based on 3D asset dimensions
+ipcMain.on('resize-window', (event, size) => {
+  if (mainWindow) {
+    const [x, y] = mainWindow.getPosition();
+    const [w, h] = mainWindow.getSize();
+    const deltaW = Math.round(size.width - w);
+    const deltaH = Math.round(size.height - h);
+    
+    // Adjust position coordinates by the size delta so the bottom-right corner stays anchored
+    mainWindow.setBounds({
+      x: Math.round(x - deltaW),
+      y: Math.round(y - deltaH),
+      width: Math.round(size.width),
+      height: Math.round(size.height)
+    });
   }
 });

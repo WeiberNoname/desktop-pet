@@ -5,9 +5,107 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D Desktop Pet</title>
   <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./node_modules/three/build/three.module.js"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="container"></div>
+
+  <!-- Floating Speech Bubble -->
+  <div id="speech-bubble" class="speech-bubble hidden">
+    <div id="bubble-text" class="bubble-text">Hi there!</div>
+    <div class="bubble-arrow"></div>
+  </div>
+
+  <!-- Settings Cog Button -->
+  <button id="settings-btn" class="settings-btn" title="Open Settings" style="display: none;">⚙️</button>
+
+  <!-- Settings Panel Overlay -->
+  <div id="settings-panel" class="settings-panel hidden">
+    <h3>⚙️ Mascot Settings</h3>
+    
+    <div class="setting-item">
+      <label for="model-select">Active Mascot</label>
+      <select id="model-select">
+        <option value="procedural">Procedural Mascot (Pink Bunny)</option>
+      </select>
+    </div>
+
+    <div class="setting-item">
+      <label for="win-width">Window Width: <span id="val-width">350</span>px</label>
+      <input type="range" id="win-width" min="30" max="1920" value="350">
+    </div>
+    
+    <div class="setting-item">
+      <label for="win-height">Window Height: <span id="val-height">350</span>px</label>
+      <input type="range" id="win-height" min="30" max="1080" value="350">
+    </div>
+    
+    <div class="setting-item">
+      <label for="model-scale">Model Scale: <span id="val-scale">1.00</span>x</label>
+      <input type="range" id="model-scale" min="0.1" max="5.0" step="0.01" value="1.00">
+    </div>
+    
+    <div class="setting-item checkbox">
+      <input type="checkbox" id="model-bobbing" checked>
+      <label for="model-bobbing">Enable Idle Bobbing</label>
+    </div>
+    
+    <div class="setting-item checkbox">
+      <input type="checkbox" id="lock-position">
+      <label for="lock-position">Lock Mascot Position</label>
+    </div>
+
+    <div class="setting-item checkbox">
+      <input type="checkbox" id="gpu-optimize" checked>
+      <label for="gpu-optimize">Force High-Performance GPU <span style="font-size: 10px; opacity: 0.7;">(Requires Restart)</span></label>
+    </div>
+    
+    <div class="setting-item checkbox">
+      <input type="checkbox" id="mouse-optimize" checked>
+      <label for="mouse-optimize">Seamless Performance Mode <span style="font-size: 10px; opacity: 0.7;">(Throttled Proxy)</span></label>
+    </div>
+    
+    <div class="setting-item checkbox">
+      <input type="checkbox" id="settings-left">
+      <label for="settings-left">Place Settings Icon on Left</label>
+    </div>
+    
+    <div class="settings-section">
+      <h4>Axis Spinning</h4>
+      <div class="spin-controls-grid">
+        <div class="spin-row">
+          <input type="checkbox" id="spin-x">
+          <label for="spin-x">X Axis</label>
+          <input type="range" id="speed-x" min="-5.0" max="5.0" step="0.1" value="1.0">
+          <span class="spin-val" id="val-speed-x">1.0</span>
+        </div>
+        <div class="spin-row">
+          <input type="checkbox" id="spin-y">
+          <label for="spin-y">Y Axis</label>
+          <input type="range" id="speed-y" min="-5.0" max="5.0" step="0.1" value="1.0">
+          <span class="spin-val" id="val-speed-y">1.0</span>
+        </div>
+        <div class="spin-row">
+          <input type="checkbox" id="spin-z">
+          <label for="spin-z">Z Axis</label>
+          <input type="range" id="speed-z" min="-5.0" max="5.0" step="0.1" value="1.0">
+          <span class="spin-val" id="val-speed-z">1.0</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="settings-buttons">
+      <button id="save-btn" class="btn save">Save Settings</button>
+      <button id="close-btn" class="btn close">Close</button>
+    </div>
+  </div>
+
   <script type="module" src="renderer.js"></script>
 </body>
 </html>

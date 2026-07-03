@@ -1,0 +1,106 @@
+================================================================================
+PLAN T003: INTERACTION SEAMLESSNESS PLAN - ELIMINATING HOVER LAG
+================================================================================
+
+This plan details solutions for eliminating frame rate stutters (lag) when the mouse
+enters or leaves the mascot character. It addresses the architectural bottleneck in
+how hover hit-testing and Electron Inter-Process Communication (IPC) are handled.
+
+--------------------------------------------------------------------------------
+THE BOTTLENECK ANALYSIS (Why it lags)
+--------------------------------------------------------------------------------
+1. High-Frequency Raycasting:
+   Every time the mouse moves inside the window, the `mousemove` listener triggers.
+   Modern gaming mice poll at 125Hz to 1000Hz (firing up to 1000 events per second).
+   The app currently runs `raycaster.intersectObjects()` on *every single* event
+   against the complex, high-polygon 3D skeletal mesh hierarchy. This blocks the
+   browser's main thread and delays rendering.
+2. Rapid IPC Messages:
+   Toggling mouse click-through triggers `ipcRenderer.send('set-ignore-mouse')`.
+   If the mouse crosses the boundary quickly, rapid back-and-forth inter-process
+   serialization stalls the Electron event queue.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: RAYCAST FREQUENCY THROTTLING (Time-Based Optimization)
+--------------------------------------------------------------------------------
+Restrict the raycast calculations to run at a lower, controlled frequency rather
+than synchronously on every raw mouse event.
+
+How it works:
+Instead of running raycasts instantly, we capture mouse coordinates and defer
+intersection calculations using a time-throttler. We limit calculations to run
+at a maximum rate of once every 16ms (~60Hz) or 32ms (~30Hz):
+```javascript
+let lastRaycastTime = 0;
+window.addEventListener('mousemove', (event) => {
+  const now = Date.now();
+  if (now - lastRaycastTime < 32) return; // Skip calculation if too frequent
+  lastRaycastTime = now;
+  
+  // Execute raycast here...
+});
+```
+
+Pros:
+* Reductions: Reduces raycasting CPU cycles by 80% to 90%.
+* Keeps the exact pixel-perfect shape outline detection intact.
+* Extremely simple code override.
+
+Cons:
+* A tiny hover cursor delay of 16-32ms (humanly imperceptible).
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: SIMPLIFIED COLLISION PROXIES (Geometry-Based Optimization)
+--------------------------------------------------------------------------------
+Run the raycasting query against a hidden, ultra-simple geometric volume rather
+than the high-polygon character mesh.
+
+How it works:
+1. Create a transparent, low-polygon box or sphere (`THREE.Mesh`) matching the
+   mascot's dimensions, and add it to `characterGroup`.
+2. Configure this proxy mesh: `visible = false` (or set a transparent material).
+3. In `mousemove`, perform raycasting *only* against this single box mesh:
+   `raycaster.intersectObject(collisionProxyMesh)`
+   Since a box contains only 12 triangles, the raycast is mathematically instant
+   (taking <0.05ms) regardless of the model complexity.
+
+Pros:
+* 100% elimination of geometry calculation lag, even for heavy 100,000+ polygon assets.
+* Provides a more forgiving hover/click target (users can click the pet easily without
+  aiming between limbs).
+
+Cons:
+* Clicks on negative space (like holes in the model) will register as hovers.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: 2D PROJECTED MATH DETECTION (Raycast-Free Optimization)
+--------------------------------------------------------------------------------
+Avoid 3D raycasting entirely by doing 2D coordinate distance checks in screen pixels.
+
+How it works:
+Instead of casting rays through a virtual 3D scene, we check the mouse's 2D screen
+coordinates relative to the window center.
+- For a 350x350 window, the character is centered at (175, 175).
+- In the mouse event, check if the distance to the center is less than a radius:
+  ```javascript
+  const dx = event.clientX - (window.innerWidth / 2);
+  const dy = event.clientY - (window.innerHeight / 2);
+  const distance = Math.sqrt(dx*dx + dy*dy);
+  const isHovered = distance < (characterRadius * currentSettings.scale);
+  ```
+
+Pros:
+* Zero WebGL/Three.js calculations. Execution takes 0.001ms.
+* Eliminates raycasting code entirely.
+
+Cons:
+* Assumes a generic circle/box bounding region, which doesn't conform to wings or tails.
+
+--------------------------------------------------------------------------------
+RECOMMENDED IMPLEMENTATION ROADMAP
+================================================================================
+We recommend combining **Alternative 1 (Throttling)** and **Alternative 2 (Proxy)**:
+1. Wrap the mouse move coordinates check inside a 16ms (~60 FPS) throttler to suppress
+   high-frequency mouse polling rates.
+2. If lag persists for high-poly custom models, create a simplified bounding box proxy
+   for hit-testing.
