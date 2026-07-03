@@ -1,3 +1,8 @@
+
+
+https://github.com/user-attachments/assets/51b7a1df-c22e-433f-813f-2610c0b7bef4
+
+
 # 3D Transparent Desktop Mascot Pet 🐰
 
 A floating, borderless, fully transparent (RGBA 0, 0, 0, 0) 3D interactive mascot desktop application for Windows built using **Electron** and **Three.js**.
