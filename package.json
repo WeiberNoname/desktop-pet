@@ -1,0 +1,17 @@
+{
+  "name": "desktop-pet",
+  "version": "1.0.0",
+  "description": "Transparent 3D Interactive Mascot Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-packager . DesktopPet --platform=win32 --arch=x64 --overwrite"
+  },
+  "dependencies": {
+    "three": "^0.166.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-packager": "^17.1.2"
+  }
+}
