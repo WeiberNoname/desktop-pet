@@ -1,5 +1,19 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+let steamClient = null;
+try {
+  const steamworks = require('steamworks.js');
+  steamClient = steamworks.init(480);
+  if (steamClient && steamClient.localUser) {
+    console.log("Steamworks API initialized. Active user:", steamClient.localUser.getSteamName());
+  } else {
+    console.log("Steamworks API initialized successfully (No local user info).");
+  }
+} catch (err) {
+  console.warn("Steamworks API failed to initialize (Offline Mode):", err.message);
+}
 
 let mainWindow;
 
@@ -37,7 +51,7 @@ function createWindow() {
   });
 }
 
-const fs = require('fs');
+
 
 // Helper to determine path to settings configuration file inside main process
 function getAssetsPath() {
@@ -130,5 +144,26 @@ ipcMain.on('resize-window', (event, size) => {
       width: Math.round(size.width),
       height: Math.round(size.height)
     });
+  }
+});
+
+// IPC handler to activate Steam achievements
+ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
+  if (steamClient) {
+    try {
+      if (!steamClient.achievements.isActivated(achievementName)) {
+        steamClient.achievements.activate(achievementName);
+        console.log(`[Steam] Achievement activated: ${achievementName}`);
+        event.reply('steam-achievement-unlocked', { success: true, name: achievementName, isSteamOnline: true });
+      } else {
+        console.log(`[Steam] Achievement already unlocked: ${achievementName}`);
+        event.reply('steam-achievement-unlocked', { success: false, alreadyUnlocked: true, name: achievementName, isSteamOnline: true });
+      }
+    } catch (err) {
+      console.error(`[Steam] Error activating achievement:`, err);
+      event.reply('steam-achievement-unlocked', { success: false, error: err.message, name: achievementName, isSteamOnline: false });
+    }
+  } else {
+    event.reply('steam-achievement-unlocked', { success: false, name: achievementName, isSteamOnline: false });
   }
 });
