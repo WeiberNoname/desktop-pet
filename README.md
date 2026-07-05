@@ -31,6 +31,13 @@ Ideal if you want to inspect, debug, or extend the JavaScript source files.
    ```bash
    cd C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet
    ```
++. Installation(Local node_modules folder is missing or incomplete.):
+   ```bash
+   npm install
+   ```
+<img width="750" height="170" alt="Screenshot 2026-07-05 143120" src="https://github.com/user-attachments/assets/8bd55513-383d-454c-a276-17406037c749" />
+
+   
 3. Start the dev app:
    ```bash
    npm start
@@ -120,3 +127,15 @@ While the application code automatically requests high-performance discrete grap
 
 > [!NOTE]
 > To modify the source scripts, open the project inside your editor and make changes directly in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js) or [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js).
+
+error message:
+npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because running scripts is disabled on this system. For
+more information, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170.
+At line:1 char:1
++ npm run build
++ ~~~
+    + CategoryInfo          : SecurityError: (:) [], PSSecurityException
+    + FullyQualifiedErrorId : UnauthorizedAccess
+
+> [!NOTE]
+> fix command: Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
