@@ -1,0 +1,132 @@
+================================================================================
+PLAN T006: CREATING & ANIMATING CUSTOM 3D MASCOT ASSETS
+================================================================================
+
+This document provides a step-by-step guide on how to create, rig, and animate
+custom 3D pet characters that can be loaded and played by the application's
+Three.js animation engine.
+
+--------------------------------------------------------------------------------
+TECHNICAL REQUIREMENTS & CONSTRAINTS FOR THE APP
+--------------------------------------------------------------------------------
+Before choosing a creation alternative, ensure your asset complies with the
+app's engine constraints:
+1. File Format: Must be exported as a single `.glb` (GL Transmission Format Binary)
+   file containing geometry, materials, textures, bones (skeleton), and animation.
+2. Target Polygon Count: Keep polygon counts low (ideally under 15,000 triangles).
+   Transparent WebGL renders at 60+ FPS, and high-polygon count models will increase
+   GPU consumption.
+3. Texture & Material Rules:
+   - Use standard PBR (Physically Based Rendering) materials.
+   - Do NOT use Blender procedural shaders (like Wave, Noise, or complex math nodes).
+     WebGL cannot read them directly.
+   - Bake all materials into standard image textures (diffuse/color, roughness,
+     metallic, normal maps).
+4. The First-Track Loop Rule:
+   - The application parses animations and plays the first clip:
+     `const action = mixer.clipAction(gltf.animations[0]); action.play();`
+   - Therefore, your main idle or looping animation MUST be exported as the first
+     clip at index 0.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: PROFESSIONAL 3D WORKFLOW (BLENDER FROM SCRATCH)
+--------------------------------------------------------------------------------
+This option gives you full creative control over the mascot design, topology,
+rigging quality, and animation details.
+
+How it works:
+1. Modeling: Build your character mesh in Blender. Ensure scales are applied (Ctrl+A ➔
+   All Transforms) and the model's pivot point is centered at the bottom of the mesh.
+2. Rigging: Add an Armature (bones) to the scene. Parent the character mesh to the
+   armature using "With Automatic Weights" (Ctrl+P). Refine the weights in Weight
+   Paint mode to prevent mesh stretching.
+3. Animation: Open the Dope Sheet and switch to the "Action Editor". Create your
+   looping animation (e.g. idle bobbing, walk cycle).
+   - In the Action Editor, push down the action to the NLA (Non-Linear Animation)
+     stack to save it as a track.
+   - Name your action alphabetically first (e.g. "01_Idle") to ensure Blender
+     exports it as index 0, or sort your NLA tracks with the primary animation at the top.
+4. Export Settings:
+   - Go to File ➔ Export ➔ glTF 2.0 (.glb/.gltf).
+   - Under Format, select "glTF Binary (.glb)".
+   - Under Include, check "Limit to Selected Objects" (select mesh and armature).
+   - Under Transform, ensure "+Y Up" is checked.
+   - Under Animation, check "Animation" and verify "Actions" is enabled.
+
+Pros:
+* Maximum visual and performance optimization.
+* Customized, unique meshes and expressive animations.
+* Excellent control over joint bends and skeleton structure.
+
+Cons:
+* Steep learning curve. Requires knowledge of 3D modeling, rigging, and keyframing.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: AUTO-RIGGING WORKFLOW (ADOBE MIXAMO)
+--------------------------------------------------------------------------------
+This option leverages automated skeletal rigging and a library of professional,
+ready-made animations, making it suitable for humanoid characters.
+
+How it works:
+1. Build static mesh: Create or download a static character mesh without bones (in
+   `.obj`, `.fbx`, or `.gltf` format).
+2. Upload to Mixamo: Go to Adobe Mixamo (free web tool) and upload your character.
+3. Auto-Rig: Position markers on the character's chin, wrists, elbows, knees, and
+   groin. Mixamo automatically generates the skeleton and calculates weight maps.
+4. Apply Animation: Browse Mixamo's animation library (e.g., cute dances, idle stances,
+   waving) and click to apply it to your character.
+5. Download FBX: Click Download. Select Format: "FBX Binary", Skin: "With Skin",
+   Frames per Second: "30 or 60", and Keyframe Reduction: "None".
+6. Convert in Blender:
+   - Import the FBX file into Blender.
+   - Verify the animation runs properly. Clean up any auxiliary/unneeded actions.
+   - Export the model as a `.glb` file using standard settings, ensuring the Mixamo
+     animation track is exported as the first clip (`animations[0]`).
+
+Pros:
+* Extremely fast. Zero manual rigging or keyframe creation required.
+* Access to thousands of high-quality, professional animation cycles.
+
+Cons:
+* Restricted to humanoid (bipedal) figures. Will not work for four-legged pets,
+  blobs, or abstract shapes.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: GENERATIVE AI WORKFLOW (TEXT-TO-3D CREATION)
+--------------------------------------------------------------------------------
+This option is ideal for creators with no 3D experience, utilizing AI generation
+to construct both the mascot mesh and the animation loop.
+
+How it works:
+1. Generate Mesh: Use an AI 3D generator (e.g., Meshy.ai, Luma Genie, Tripo3D, CSM)
+   to create a 3D model using text prompts (e.g., "cute toy dinosaur, plastic gloss").
+2. Rig and Animate via AI:
+   - Some platforms (like Meshy or Tripo3D) offer built-in rigging/animation generators.
+   - Alternatively, export the static mesh and upload it to a motion AI engine
+     (like DeepMotion, Rokoko Video, or CSM) to apply a walk or idle motion from video
+     or templates.
+3. Import to Blender for QA:
+   - Generative AI files often export multiple messy clips or have high polygon counts.
+   - Import the model into Blender. Use the "Decimate" modifier to lower the poly count
+     if it exceeds 20,000 triangles.
+   - Check the animation tracks, set the main loop at the top of the stack/alphabetically
+     first, and export as a clean `.glb`.
+
+Pros:
+* Requires zero modeling, rigging, or animation skills.
+* Infinite variations generated instantly via prompts.
+
+Cons:
+* High poly counts and messy mesh topologies are common, requiring manual decimation.
+* AI-generated textures can look flat, blurry, or low-resolution.
+* Movement or bone placement can contain glitches/jitter.
+
+--------------------------------------------------------------------------------
+RECOMMENDED IMPLEMENTATION ROADMAP FOR CREATORS
+--------------------------------------------------------------------------------
+1. For cute, stylized, or low-poly quadruped animals (like rabbits, cats, dogs):
+   ➔ Use Blender (Alternative 1) or generate base assets using AI and refine them.
+2. For cute humanoid figures (like small robots, elves, chibi characters):
+   ➔ Use Adobe Mixamo (Alternative 2) for near-instant rigging and professional animations.
+3. For rapid prototyping or experimental pets:
+   ➔ Use Generative AI (Alternative 3) to prompt and test concepts.

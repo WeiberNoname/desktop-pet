@@ -1,0 +1,128 @@
+================================================================================
+PLAN T008: MULTI-ANIMATION STATE ENGINE & PET ENJOYMENT ASSESSMENT
+================================================================================
+
+This document details 3 technical solutions (with 3 implementation alternatives
+each) to expand the mascot engine from playing a single loop to hosting and
+playing multiple dynamic animations. The design focuses on enhancing user enjoyment,
+nurturing, and visual variety in a desktop pet application.
+
+--------------------------------------------------------------------------------
+PET ENJOYMENT DESIGN CONSIDERATIONS
+--------------------------------------------------------------------------------
+To make a desktop pet enjoyable, the animation system must avoid predictability
+and feel responsive to the user. Key principles include:
+1. Autonomy: The pet should show "life of its own" by changing behaviors even
+   when the user is not actively interacting with it.
+2. Contextual Awareness: The pet should react differently to hover, click, drag,
+   or long-term neglect.
+3. Bonding & Care: The pet's visual state should reflect its mood or needs,
+   giving the user a sense of responsibility and progression.
+
+--------------------------------------------------------------------------------
+1. SOLUTION 1: BEHAVIORAL STATE MACHINE & IDLE SCHEDULER (Autonomy)
+--------------------------------------------------------------------------------
+Instead of looping one track, the app runs a finite state machine (FSM) that shifts
+the pet between states (e.g., IDLE, WALKING, SLEEPING, BORED), scheduling random
+or conditional animation selections from the GLB asset's animation pool.
+
+* Alternative A: Time-of-Day Syncing
+  - How it works: Query local OS hours inside renderer.js. During daylight hours
+    (8 AM - 8 PM), the pet cycles active/idle animations. At night (8 PM - 8 AM),
+    it transitions into a sleeping pose with Zzz particle effects, encouraging
+    the user to rest.
+  - Pros: Emphasizes a natural circadian bond with the user's routine.
+  - Cons: Requires handling different timezone offsets or custom bedtime configs.
+
+* Alternative B: Inactivity & Boredom Timer
+  - How it works: Reset a timer on any hover/click. If mouse activity ceases for
+    3 minutes, play a "yawn" animation and transition to a sitting "bored" loop.
+    If inactive for 10 minutes, transition to a "sleeping" animation.
+  - Pros: Makes the pet feel like an active companion that demands presence or
+    falls asleep when ignored.
+  - Cons: Idle cycles must blend smoothly to avoid sudden pops.
+
+* Alternative C: Probabilistic Action Pool
+  - How it works: Every 15–30 seconds during the idle state, run a random probability roll.
+    There is a 75% chance to stay in default idle, a 15% chance to perform a quick ambient action
+    (e.g., scratch ears, blink, stretch), and a 10% chance to glance around.
+  - Pros: Keeps the pet's idle cycles fresh and unpredictable.
+  - Cons: Requires the 3D model to have distinct, clean transition points.
+
+--------------------------------------------------------------------------------
+2. SOLUTION 2: CONTEXT-AWARE INTERACTIVE REACTIONS (Tactile Feedback)
+--------------------------------------------------------------------------------
+This solution maps user input gestures (hovering, clicking, holding/dragging, or UI actions)
+directly to dedicated, responsive animation clips.
+
+* Alternative A: Mouse Hover Startle & Wag
+  - How it works: On mouseenter/raycast hit, pause the idle loop and play a quick
+    "waving" or "startled glance" reaction clip once before easing back to idle.
+  - Pros: Enhances the pet's awareness of the mouse cursor, making it feel physical.
+  - Cons: High-speed mouse swipes might stutter the transition if not throttled.
+
+* Alternative B: Drag-State Dangling Physics
+  - How it works: When dragging the window (mousedown + drag), trigger a flailing
+    "dangling" animation (e.g., arms and legs kicking, ears swept back).
+    Scale the playback speed (timeScale) based on the speed of mouse movement.
+  - Pros: Provides hilarious, high-tactility feedback when repositioning the pet.
+  - Cons: Requires custom models to have dedicated hanging/kicking animations.
+
+* Alternative C: Close & Open Emotional States
+  - How it works: Play an "excited greeting" animation when the app launches or when
+    settings close. Play a "sad/pouting" animation briefly when settings are opened
+    (since the panel blocks views) or when the app is shut down.
+  - Pros: Adds emotional stakes to basic UI operations.
+  - Cons: Delaying app closing to play a quick animation requires blocking OS exit events.
+
+--------------------------------------------------------------------------------
+3. SOLUTION 3: TAMAGOTCHI-STYLE CARE METERS & MOODS (Bonding & Nurturing)
+--------------------------------------------------------------------------------
+Introduce persistent variables for core needs (Hunger, Energy, Affection) that deplete
+slowly. The pet changes its active animation sets depending on its current stats.
+
+* Alternative A: Mood-Based Animation Swapping
+  - How it works: Based on needs (e.g. Affection < 30), swap the default idle animation
+    to a "sad" loop. If Energy < 20, swap to a "gasping/exhausted" loop. Feeding or
+    petting restores the values, transitioning the loops back to "happy/normal".
+  - Pros: Highly addictive care loops that encourage daily interaction.
+  - Cons: Requires saving status timestamps to track depletion while the app is closed.
+
+* Alternative B: Petting Detection via Mouse Scraping
+  - How it works: Track the frequency of mouse movement inside the mascot's collision proxy.
+    If the user sweeps the mouse back and forth rapidly, register it as "petting". Play
+    a "giggle/purr" animation, emit heart icons, and restore the Affection meter.
+  - Pros: Satisfying, intuitive, and tactile way to interact without clicking.
+  - Cons: Can overlap with window dragging tracking if dragging is not properly locked out.
+
+* Alternative C: Achievement & Evolution States
+  - How it works: Maintain a lifetime experience level or friendship score.
+    Higher levels unlock advanced animations (e.g., backflip, breakdance, sleep on back).
+    Optionally, scale the model up slightly as it "grows".
+  - Pros: Encourages long-term retention and play.
+  - Cons: Requires authoring or packing many distinct clips into a single asset.
+
+--------------------------------------------------------------------------------
+RECOMMENDED IMPLEMENTATION ROADMAP FOR PET SYSTEM
+--------------------------------------------------------------------------------
+To build a highly engaging pet, we recommend implementing the solutions in order:
+
+1. Phase 1 (Dynamic Settings Selector - Core Infrastructure):
+   - Goal: Build the core capability to show various animations, including an option for
+     no animation (static pose), configured directly from the Settings Panel.
+   - Details: Similar to model selection, dynamically read all animation clips from the
+     active GLB. Populate a dropdown selector in the Settings menu (e.g. "Select Animation")
+     listing all clip names, plus a "None (Static Pose)" option. Store the preference in the
+     settings configuration file, and load the chosen animation on launch or settings change.
+   - Enjoyment Value: Gives the user immediate manual control over their companion's pose/loop.
+
+2. Phase 2 (Context-Aware Tactile Reactions):
+   - Goal: Build hover-startle and drag-dangling animation triggers (Solution 2).
+   - Details: Temporarily override the user's selected animation loop during mouse gestures,
+     reverting back to the settings-selected loop when the interaction finishes.
+
+3. Phase 3 (Autonomous States & Moods):
+   - Goal: Build schedules and care meters (Solution 1 & Solution 3).
+   - Details: Integrate boredom/sleep timers and Tamagotchi-style needs to dynamically shift
+     the active animation state, creating long-term nurturing gameplay.
+

@@ -8,6 +8,10 @@ const { pathToFileURL } = window.require('url');
 
 let scene, camera, renderer, characterGroup, innerModelGroup, collisionProxy;
 let mixer;
+let idleAction = null;
+let reactAction = null;
+let loadedAnimations = [];
+let availableAnimations = [];
 let customModelLoaded = false;
 
 // Settings Panel configurations
@@ -27,6 +31,7 @@ let currentSettings = {
   settingsLeft: false,
   lockPosition: false,
   activeModel: 'procedural',
+  activeAnimation: 'default',
   clickCount: 0
 };
 
@@ -437,6 +442,16 @@ function triggerInteraction() {
   animationState.type = 'interact';
   animationState.startTime = Date.now();
 
+  if (mixer) {
+    if (reactAction && idleAction) {
+      reactAction.reset();
+      idleAction.crossFadeTo(reactAction, 0.15, true);
+      reactAction.play();
+    } else if (idleAction) {
+      idleAction.timeScale = 2.0; // speed up single animation
+    }
+  }
+
   const reactions = [
     "Wheee! 🚀",
     "Hold on tight! 🌪️",
@@ -542,6 +557,10 @@ function fallbackToProcedural() {
     mixer.stopAllAction();
     mixer = null;
   }
+  idleAction = null;
+  reactAction = null;
+  loadedAnimations = [];
+  availableAnimations = [];
   if (characterGroup) {
     scene.remove(characterGroup);
   }
@@ -648,10 +667,14 @@ function loadCustomModel(filePath) {
       }
 
       // Load animations
-      if (gltf.animations && gltf.animations.length > 0) {
+      loadedAnimations = gltf.animations || [];
+      availableAnimations = loadedAnimations.map(clip => clip.name || '');
+      
+      idleAction = null;
+      reactAction = null;
+      if (loadedAnimations.length > 0) {
         mixer = new THREE.AnimationMixer(model);
-        const action = mixer.clipAction(gltf.animations[0]);
-        action.play();
+        applySelectedAnimation();
       }
       
       customModelLoaded = true;
@@ -663,6 +686,37 @@ function loadCustomModel(filePath) {
   } catch (err) {
     console.error('Synchronous loader crash:', err);
     fallbackToProcedural();
+  }
+}
+
+function applySelectedAnimation() {
+  if (!mixer) return;
+  
+  mixer.stopAllAction();
+  idleAction = null;
+  reactAction = null;
+  
+  if (currentSettings.activeAnimation === 'none') {
+    console.log('Animation is set to none (static pose).');
+    return;
+  }
+  
+  let targetClip = null;
+  
+  // 1. Try to find clip by name
+  if (currentSettings.activeAnimation !== 'default') {
+    targetClip = loadedAnimations.find(clip => clip.name === currentSettings.activeAnimation);
+  }
+  
+  // 2. Fall back to index 0 if not found, or if default
+  if (!targetClip && loadedAnimations.length > 0) {
+    targetClip = loadedAnimations[0];
+  }
+  
+  if (targetClip) {
+    console.log('Playing active animation loop:', targetClip.name);
+    idleAction = mixer.clipAction(targetClip);
+    idleAction.play();
   }
 }
 
@@ -730,6 +784,7 @@ settingsLeft=false`;
           if (key === 'settingsLeft') currentSettings.settingsLeft = (val === 'true');
           if (key === 'lockPosition') currentSettings.lockPosition = (val === 'true');
           if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
+          if (key === 'activeAnimation') currentSettings.activeAnimation = val || 'default';
           if (key === 'clickCount') currentSettings.clickCount = parseInt(val, 10) || 0;
         }
       });
@@ -762,6 +817,7 @@ mouseOptimize=${currentSettings.mouseOptimize}
 settingsLeft=${currentSettings.settingsLeft}
 lockPosition=${currentSettings.lockPosition}
 activeModel=${currentSettings.activeModel}
+activeAnimation=${currentSettings.activeAnimation}
 clickCount=${currentSettings.clickCount}`;
 
   try {
@@ -793,6 +849,7 @@ function setupSettingsUI() {
   const settingsLeftCheck = document.getElementById('settings-left');
   const lockPositionCheck = document.getElementById('lock-position');
   const modelSelect = document.getElementById('model-select');
+  const animSelect = document.getElementById('anim-select');
   
   const valWidth = document.getElementById('val-width');
   const valHeight = document.getElementById('val-height');
@@ -821,6 +878,46 @@ function setupSettingsUI() {
     });
   };
 
+  const populateAnimationDropdown = () => {
+    const container = document.getElementById('anim-select-container');
+    if (!animSelect) return;
+    
+    if (modelSelect.value === 'procedural') {
+      animSelect.innerHTML = '<option value="none">Procedural (Default Loop)</option>';
+      animSelect.disabled = true;
+      if (container) container.style.opacity = '0.5';
+      return;
+    }
+    
+    animSelect.disabled = false;
+    if (container) container.style.opacity = '1.0';
+    
+    animSelect.innerHTML = '<option value="none">None (Static Pose)</option>';
+    
+    availableAnimations.forEach((clipName, idx) => {
+      const option = document.createElement('option');
+      const val = clipName || String(idx);
+      option.value = val;
+      option.textContent = clipName ? `${idx + 1}. ${clipName}` : `Animation ${idx + 1}`;
+      animSelect.appendChild(option);
+    });
+    
+    if (currentSettings.activeAnimation === 'default') {
+      if (availableAnimations.length > 0) {
+        animSelect.value = availableAnimations[0] || '0';
+      } else {
+        animSelect.value = 'none';
+      }
+    } else {
+      const exists = availableAnimations.includes(currentSettings.activeAnimation);
+      if (exists) {
+        animSelect.value = currentSettings.activeAnimation;
+      } else {
+        animSelect.value = 'none';
+      }
+    }
+  };
+
   populateModelDropdown();
 
   // Sync sliders UI with the saved settings
@@ -843,6 +940,7 @@ function setupSettingsUI() {
     settingsLeftCheck.checked = currentSettings.settingsLeft;
     lockPositionCheck.checked = currentSettings.lockPosition;
     modelSelect.value = currentSettings.activeModel;
+    populateAnimationDropdown();
 
     valWidth.innerText = currentSettings.width;
     valHeight.innerText = currentSettings.height;
@@ -854,6 +952,17 @@ function setupSettingsUI() {
   };
 
   syncSlidersUI();
+
+  modelSelect.addEventListener('change', () => {
+    if (modelSelect.value === 'procedural') {
+      populateAnimationDropdown();
+    } else {
+      animSelect.innerHTML = '<option value="default">Default (Load on Save)</option>';
+      animSelect.disabled = true;
+      const container = document.getElementById('anim-select-container');
+      if (container) container.style.opacity = '0.7';
+    }
+  });
 
   // Listeners that only update the numerical labels live (does not resize window yet)
   widthSlider.addEventListener('input', () => {
@@ -927,6 +1036,10 @@ function setupSettingsUI() {
     const modelChanged = (oldModel !== newModel);
     currentSettings.activeModel = newModel;
 
+    if (animSelect) {
+      currentSettings.activeAnimation = animSelect.value;
+    }
+
     // 2. Save settings to local configuration file
     saveSettingsFile();
 
@@ -939,6 +1052,10 @@ function setupSettingsUI() {
         mixer.stopAllAction();
         mixer = null;
       }
+      idleAction = null;
+      reactAction = null;
+      loadedAnimations = [];
+      availableAnimations = [];
       if (characterGroup) {
         scene.remove(characterGroup);
       }
@@ -952,6 +1069,8 @@ function setupSettingsUI() {
         console.log('Swapping active mascot model to:', fullPath);
         loadCustomModel(fullPath);
       }
+    } else {
+      applySelectedAnimation();
     }
 
     // Apply position shift to the gear button
@@ -1082,25 +1201,48 @@ function animate() {
       characterGroup.rotation.set(0.08, 0, 0);
       const targetScale = hasSettingsFile ? currentSettings.scale : 1.0;
       characterGroup.scale.set(targetScale, targetScale, targetScale);
+
+      if (mixer) {
+        if (reactAction && idleAction) {
+          idleAction.reset();
+          reactAction.crossFadeTo(idleAction, 0.2, true);
+          idleAction.play();
+        } else if (idleAction) {
+          idleAction.timeScale = 1.0; // reset single animation speed
+        }
+      }
     } else {
-      // Interaction Animation: High Jump & 360 Spin
-      const height = Math.sin(progress * Math.PI) * 1.3;
-      characterGroup.position.y = height;
-
-      // 360-degree spin
-      characterGroup.rotation.y = progress * Math.PI * 2;
-
-      // Squash and stretch transitions relative to base scale
-      const baseScale = hasSettingsFile ? currentSettings.scale : 1.0;
-      if (progress < 0.2) {
-        characterGroup.scale.set(baseScale * 1.15, baseScale * 0.8, baseScale * 1.15);
-      } else if (progress < 0.8) {
-        characterGroup.scale.set(baseScale * 0.9, baseScale * 1.2, baseScale * 0.9);
+      if (customModelLoaded) {
+        // Keep idle floating/bobbing up and down for custom model during interaction state
+        if (currentSettings.bobbing) {
+          characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12;
+          characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
+          characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
+        } else {
+          characterGroup.position.y = 0;
+          characterGroup.rotation.z = 0;
+          characterGroup.rotation.y = 0;
+        }
       } else {
-        const factor = (progress - 0.8) / 0.2;
-        const squashY = 0.75 + (factor * 0.25);
-        const stretchXZ = 1.2 - (factor * 0.2);
-        characterGroup.scale.set(baseScale * stretchXZ, baseScale * squashY, baseScale * stretchXZ);
+        // Interaction Animation: High Jump & 360 Spin (Procedural Mascot Only)
+        const height = Math.sin(progress * Math.PI) * 1.3;
+        characterGroup.position.y = height;
+
+        // 360-degree spin
+        characterGroup.rotation.y = progress * Math.PI * 2;
+
+        // Squash and stretch transitions relative to base scale
+        const baseScale = hasSettingsFile ? currentSettings.scale : 1.0;
+        if (progress < 0.2) {
+          characterGroup.scale.set(baseScale * 1.15, baseScale * 0.8, baseScale * 1.15);
+        } else if (progress < 0.8) {
+          characterGroup.scale.set(baseScale * 0.9, baseScale * 1.2, baseScale * 0.9);
+        } else {
+          const factor = (progress - 0.8) / 0.2;
+          const squashY = 0.75 + (factor * 0.25);
+          const stretchXZ = 1.2 - (factor * 0.2);
+          characterGroup.scale.set(baseScale * stretchXZ, baseScale * squashY, baseScale * stretchXZ);
+        }
       }
     }
   } else {
@@ -1118,13 +1260,13 @@ function animate() {
     // Smooth floating/bobbing up and down (applies to both custom and procedural if enabled)
     if (currentSettings.bobbing) {
       characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12;
+      characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
+      characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
     } else {
       characterGroup.position.y = 0;
+      characterGroup.rotation.z = 0;
+      characterGroup.rotation.y = 0;
     }
-
-    // Subtle looking around (applies to both)
-    characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
-    characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
   }
 
   renderer.render(scene, camera);
