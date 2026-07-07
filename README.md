@@ -1,4 +1,5 @@
 <img width="400" height="236" alt="Recording 2026-07-04 002226" src="https://github.com/user-attachments/assets/ec017b5e-f488-409f-ae98-e225e1fadb53" />
+(outdated)
 
 
 # 3D Transparent Desktop Mascot Pet 🐰
