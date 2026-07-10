@@ -1,0 +1,99 @@
+================================================================================
+STEAM LAUNCH GUIDE: SELLING YOUR 3D DESKTOP PET ON STEAM
+================================================================================
+
+This document details the complete process, technical integrations, and storefront
+strategies required to launch and monetize this interactive 3D desktop pet companion
+on the Valve Steam Store.
+
+--------------------------------------------------------------------------------
+1. STEAMWORKS PARTNER SETUP (ADMINISTRATIVE STEPS)
+--------------------------------------------------------------------------------
+To publish software on Steam, you must register as a Steamworks developer:
+1. Registration: Sign up at https://partner.steamgames.com/ using a Steam account.
+2. Submission Fee: Pay the Steam Direct fee ($100 USD per product; fully refundable
+   once the app reaches $1,000 USD in adjusted gross revenue).
+3. Verification: Complete the digital tax interviews and identity verification
+   (takes 2-7 days).
+4. App ID Allocation: Once verified, Steam allocates a unique App ID for your
+   desktop pet.
+
+--------------------------------------------------------------------------------
+2. TECHNICAL ADJUSTMENTS FOR STEAM (ELECTRON INTEGRATION)
+--------------------------------------------------------------------------------
+To connect Electron to Valve's native C++ Steamworks APIs, we need a Node.js wrapper.
+
+* SDK Wrapper Options:
+  1. steamworks.js (Recommended): A modern, actively-maintained Node.js binding
+     for the Steamworks SDK using N-API.
+     Install via: `npm install steamworks.js`
+  2. greenworks: A legacy native Node addon. Harder to compile for modern Node/Electron.
+
+* Initializing Steamworks API in main.js:
+  Add the following code to register the app with Steam and ensure it is launched
+  properly (Steam must be running):
+  ```javascript
+  const steamworks = require('steamworks.js');
+  try {
+    // Replace 480 with your actual Steam App ID
+    const client = steamworks.init(480);
+    console.log("Steamworks API initialized. User:", client.localUser.getSteamId());
+  } catch (err) {
+    console.error("Steamworks failed to initialize:", err);
+  }
+  ```
+
+* Handling Steam Overlay with Transparency:
+  - Steam's overlay hook injects graphics into the window. Because this application
+    uses a borderless, transparent window framework, the Steam overlay can cause visual
+    glitches or break the alpha channel transparency.
+  - Fix: In settings, disable the Steam overlay for your App ID inside the Steamworks
+    partner console, or configure launcher flags to bypass rendering hooks.
+
+--------------------------------------------------------------------------------
+3. HIGH-VALUE STEAM FEATURES (DRIVING RETENTION & engagement)
+--------------------------------------------------------------------------------
+Integrating Steam features increases app visibility and user satisfaction:
+
+* Steam Workshop Integration (CRITICAL FOR MONETIZATION):
+  - Allow users to share and download custom 3D models (.glb/.gltf) directly inside Steam.
+  - How it works: Use Steamworks API to query subscribed Workshop items, copy files
+    to the `assets/` directory, and dynamically populate them in our Mascot Dropdown.
+  - Why: Creates a self-sustaining user community, mimicking Wallpaper Engine's model.
+
+* Steam Achievements:
+  - Add achievements linked to app usage, such as:
+    - "First Steps" (Load a custom 3D model).
+    - "Stay Hydrated" (Acknowledge 50 hydration break notifications).
+    - "Dizzy" (Click the pet to spin it 100 times).
+  - Code trigger: `client.achievements.activate('ACH_FIRST_STEPS')`
+
+* Cloud Saves:
+  - Configure Steam Cloud to sync the local `assets/settings` file.
+  - Ensures users keep their scaling preferences, selected active mascot, and spin configuration
+    across different computers.
+
+--------------------------------------------------------------------------------
+4. STEAM STOREFRONT & MARKETING STRATEGY
+--------------------------------------------------------------------------------
+To maximize conversions, tailor your store page graphics and messaging:
+
+* Category & Tags:
+  - Main Category: Software / Utilities.
+  - Primary Tags: "Desktop Utility", "Casual", "Cute", "Relaxing", "3D", "Moddable".
+
+* Core Marketing Assets (Store Capsules):
+  - Create vibrant, eye-catching banners highlighting the cute bunny or loaded custom avatars.
+  - Trailer: Show a screen recording of the pet floating next to a coding editor, climbing
+    windows, popping up hydration reminders, and reacting to clicks. Emphasize that it is
+    borderless and fully transparent.
+
+* Localization Targets:
+  - Desktop companions are highly popular in East Asian and Western tech markets.
+  - Translate the store description, settings menu, and speech bubble dialogue to:
+    - Simplified/Traditional Chinese, Japanese, Korean, English, German, and Spanish.
+
+* Pricing Model:
+  - Recommended Price Point: $1.99 - $3.99 USD.
+  - Release Strategy: Launch with a 10% launch discount to gain early reviews. Steam's algorithm
+    promotes apps once they reach 10+ positive user reviews.

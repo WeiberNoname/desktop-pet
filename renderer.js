@@ -8,6 +8,10 @@ const { pathToFileURL } = window.require('url');
 
 let scene, camera, renderer, characterGroup, innerModelGroup, collisionProxy;
 let mixer;
+let idleAction = null;
+let reactAction = null;
+let loadedAnimations = [];
+let availableAnimations = [];
 let customModelLoaded = false;
 
 // Settings Panel configurations
@@ -26,7 +30,10 @@ let currentSettings = {
   mouseOptimize: true,
   settingsLeft: false,
   lockPosition: false,
-  activeModel: 'procedural'
+  activeModel: 'procedural',
+  activeAnimation: 'default',
+  clickCount: 0,
+  fontSizeScale: 1.0
 };
 
 let discoveredModels = [];
@@ -49,10 +56,27 @@ function updateGearPosition() {
 let hasSettingsFile = false;
 let isSettingsOpen = false;
 let isMouseOverCharacter = false;
+let isMouseOverUI = false;
 let isDragging = false;
 let dragStartScreenX = 0;
 let dragStartScreenY = 0;
 let dragMoveDistance = 0;
+
+// Navigation States (Blender-style Viewport Orbit/Pan/Zoom)
+let isNavigating = false;
+let navType = 'orbit'; // 'orbit', 'pan', 'zoom'
+let navStartMouseX = 0;
+let navStartMouseY = 0;
+let navStartRotationX = 0;
+let navStartRotationY = 0;
+let navStartTranslationX = 0;
+let navStartTranslationY = 0;
+let navStartTranslationZ = 0;
+
+// Modifier key states for click-through override tracking
+let altKeyHeld = false;
+let shiftKeyHeld = false;
+let ctrlKeyHeld = false;
 
 // Animation state
 let animationState = {
@@ -66,6 +90,11 @@ function init() {
   
   // Load settings configuration file if it exists in assets/
   hasSettingsFile = readSettingsFile();
+
+  const settingsPanel = document.getElementById('settings-panel');
+  if (settingsPanel && currentSettings.fontSizeScale) {
+    settingsPanel.style.setProperty('--panel-font-scale', currentSettings.fontSizeScale);
+  }
 
   // 1. Create Scene
   scene = new THREE.Scene();
@@ -122,6 +151,32 @@ function init() {
 
   // Handle Resize
   window.addEventListener('resize', onWindowResize);
+
+  // Listen for Steam achievement updates from main process
+  ipcRenderer.on('steam-achievement-unlocked', (event, result) => {
+    if (result.success) {
+      const achievementsInfo = {
+        'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
+        'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
+        'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
+        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘'
+      };
+      const friendlyName = achievementsInfo[result.name] || result.name;
+      showSpeechBubble(`🏆 Steam Achievement Unlocked:\n${friendlyName}`, 5000);
+    } else if (result.alreadyUnlocked) {
+      console.log(`Achievement already active on Steam: ${result.name}`);
+    } else if (!result.isSteamOnline) {
+      // Offline mode fallback: show the mock achievement toast
+      const achievementsInfo = {
+        'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
+        'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
+        'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
+        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘'
+      };
+      const friendlyName = achievementsInfo[result.name] || result.name;
+      showSpeechBubble(`🏆 Achievement Unlocked (Offline):\n${friendlyName}`, 5000);
+    }
+  });
 }
 
 function createMascot() {
@@ -273,7 +328,7 @@ function createMascot() {
   const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
   collisionProxy = new THREE.Mesh(proxyGeom, proxyMat);
   collisionProxy.position.set(0, 0, 0);
-  characterGroup.add(collisionProxy);
+  innerModelGroup.add(collisionProxy);
 
   // Tilt character slightly forward towards camera
   characterGroup.rotation.x = 0.08;
@@ -286,8 +341,46 @@ function setupInteraction() {
   const mouse = new THREE.Vector2();
   let lastRaycastTime = 0;
 
+  function updateIgnoreMouseState() {
+    const shouldFocus = isSettingsOpen || 
+                        isMouseOverCharacter || 
+                        isMouseOverUI || 
+                        isDragging || 
+                        isNavigating || 
+                        altKeyHeld || 
+                        shiftKeyHeld || 
+                        ctrlKeyHeld;
+
+    ipcRenderer.send('set-ignore-mouse', !shouldFocus);
+  }
+
   // Track mouse movements to update window ignore-mouse states
   window.addEventListener('mousemove', (event) => {
+    // Sync modifiers state from direct mouse movement events
+    altKeyHeld = event.altKey;
+    shiftKeyHeld = event.shiftKey;
+    ctrlKeyHeld = event.ctrlKey;
+
+    // Handle model-centric navigation drag updates
+    if (isNavigating) {
+      if (innerModelGroup) {
+        const deltaX = event.clientX - navStartMouseX;
+        const deltaY = event.clientY - navStartMouseY;
+
+        if (navType === 'orbit') {
+          innerModelGroup.rotation.y = navStartRotationY + deltaX * 0.01;
+          innerModelGroup.rotation.x = navStartRotationX + deltaY * 0.01;
+        } else if (navType === 'pan') {
+          innerModelGroup.position.x = navStartTranslationX + deltaX * 0.005;
+          innerModelGroup.position.y = navStartTranslationY - deltaY * 0.005;
+        } else if (navType === 'zoom') {
+          const zPos = navStartTranslationZ - deltaY * 0.01;
+          innerModelGroup.position.z = Math.max(-10.0, Math.min(4.0, zPos));
+        }
+      }
+      return;
+    }
+
     // If user is dragging the window, we don't recalculate raycast or send ignore-mouse toggles
     if (isDragging) {
       const deltaX = event.screenX - dragStartScreenX;
@@ -322,38 +415,84 @@ function setupInteraction() {
       intersects = raycaster.intersectObjects(characterGroup.children, true);
     }
 
-    if (intersects.length > 0 || isSettingsOpen) {
-      if (!isMouseOverCharacter) {
-        isMouseOverCharacter = true;
-        document.body.style.cursor = 'pointer';
-        // Tell main process NOT to ignore mouse events (allows clicks & drags)
-        ipcRenderer.send('set-ignore-mouse', false);
-      }
-    } else {
-      if (isMouseOverCharacter) {
-        isMouseOverCharacter = false;
-        document.body.style.cursor = 'default';
-        // Tell main process to ignore mouse events (clicks pass through window)
-        ipcRenderer.send('set-ignore-mouse', true);
-      }
+    const raycastHit = (intersects.length > 0);
+    if (raycastHit !== isMouseOverCharacter) {
+      isMouseOverCharacter = raycastHit;
+      document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
     }
+    updateIgnoreMouseState();
   });
 
   window.addEventListener('mousedown', (event) => {
-    if (isSettingsOpen || currentSettings.lockPosition) return;
+    if (isSettingsOpen) return;
+
+    altKeyHeld = event.altKey;
+    shiftKeyHeld = event.shiftKey;
+    ctrlKeyHeld = event.ctrlKey;
+
+    const isMMB = event.button === 1;
+    if (isMMB) {
+      event.preventDefault(); // Prevent Windows auto-scroll popups
+    }
+
+    // Blender MMB mapping rules:
+    // - MMB alone ➔ Orbit
+    // - Shift + MMB ➔ Pan
+    // - Ctrl + MMB ➔ Zoom
+    const isOrbit = event.altKey || (isMMB && !event.shiftKey && !event.ctrlKey);
+    const isPan = event.shiftKey;
+    const isZoom = event.ctrlKey;
+
+    if (isOrbit || isPan || isZoom) {
+      if (innerModelGroup) {
+        isNavigating = true;
+        navType = isOrbit ? 'orbit' : (isPan ? 'pan' : 'zoom');
+        navStartMouseX = event.clientX;
+        navStartMouseY = event.clientY;
+        navStartRotationX = innerModelGroup.rotation.x;
+        navStartRotationY = innerModelGroup.rotation.y;
+        navStartTranslationX = innerModelGroup.position.x;
+        navStartTranslationY = innerModelGroup.position.y;
+        navStartTranslationZ = innerModelGroup.position.z;
+
+        document.body.style.cursor = isOrbit ? 'all-scroll' : (isPan ? 'move' : 'zoom-in');
+        updateIgnoreMouseState();
+      }
+      return;
+    }
+
+    if (currentSettings.lockPosition) return;
     if (isMouseOverCharacter && event.button === 0) { // Left click
       isDragging = true;
       dragStartScreenX = event.screenX;
       dragStartScreenY = event.screenY;
       dragMoveDistance = 0;
       document.body.style.cursor = 'grabbing';
+      updateIgnoreMouseState();
     }
   });
 
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (event) => {
+    altKeyHeld = event.altKey;
+    shiftKeyHeld = event.shiftKey;
+    ctrlKeyHeld = event.ctrlKey;
+
+    const isMMB = event.button === 1;
+    if (isMMB) {
+      event.preventDefault();
+    }
+
+    if (isNavigating) {
+      isNavigating = false;
+      document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
+      updateIgnoreMouseState();
+      return;
+    }
+
     if (isDragging) {
       isDragging = false;
       document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
+      updateIgnoreMouseState();
 
       // Treat small drag movements as a simple click
       if (dragMoveDistance < 8) {
@@ -361,6 +500,98 @@ function setupInteraction() {
       }
     }
   });
+
+  // Scroll wheel zooming
+  window.addEventListener('wheel', (event) => {
+    if (isSettingsOpen) return;
+    if (innerModelGroup) {
+      const zoomSpeed = -0.002;
+      const newZ = innerModelGroup.position.z + event.deltaY * zoomSpeed;
+      innerModelGroup.position.z = Math.max(-10.0, Math.min(4.0, newZ));
+    }
+  }, { passive: true });
+
+  // Double-click holding Alt to reset view
+  window.addEventListener('dblclick', (event) => {
+    if (isSettingsOpen) return;
+    if (event.altKey && innerModelGroup) {
+      innerModelGroup.rotation.set(0, 0, 0);
+      innerModelGroup.position.set(0, 0, 0);
+      showSpeechBubble("View reset! 🔄", 1500);
+    }
+  });
+
+  // Keyboard modifiers activation mapping for click-through override
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Alt') altKeyHeld = true;
+    if (event.key === 'Shift') shiftKeyHeld = true;
+    if (event.key === 'Control') ctrlKeyHeld = true;
+    updateIgnoreMouseState();
+
+    // Blender emulated orthographic/perspective view hotkeys
+    if (!isSettingsOpen && innerModelGroup) {
+      const key = event.key;
+      if (key === '1') {
+        innerModelGroup.rotation.set(0, 0, 0);
+        showSpeechBubble("Front View 🐰", 1200);
+      } else if (key === '3') {
+        innerModelGroup.rotation.set(0, Math.PI / 2, 0);
+        showSpeechBubble("Right View ➡️", 1200);
+      } else if (key === '7') {
+        innerModelGroup.rotation.set(Math.PI / 2, 0, 0);
+        showSpeechBubble("Top View ⬇️", 1200);
+      } else if (key === '9') {
+        innerModelGroup.rotation.y += Math.PI;
+        showSpeechBubble("Opposite View 🔄", 1200);
+      } else if (key === '.' || key.toLowerCase() === 'f') {
+        innerModelGroup.rotation.set(0, 0, 0);
+        innerModelGroup.position.set(0, 0, 0);
+        showSpeechBubble("Frame Selected / Reset view 🔄", 1500);
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (event) => {
+    if (event.key === 'Alt') altKeyHeld = false;
+    if (event.key === 'Shift') shiftKeyHeld = false;
+    if (event.key === 'Control') ctrlKeyHeld = false;
+    updateIgnoreMouseState();
+  });
+
+  window.addEventListener('blur', () => {
+    isNavigating = false;
+    altKeyHeld = false;
+    shiftKeyHeld = false;
+    ctrlKeyHeld = false;
+    document.body.style.cursor = 'default';
+    updateIgnoreMouseState();
+  });
+
+  // Track UI hover events to prevent click-through on HTML controls
+  const gearBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+
+  if (gearBtn) {
+    gearBtn.addEventListener('mouseenter', () => {
+      isMouseOverUI = true;
+      updateIgnoreMouseState();
+    });
+    gearBtn.addEventListener('mouseleave', () => {
+      isMouseOverUI = false;
+      updateIgnoreMouseState();
+    });
+  }
+
+  if (settingsPanel) {
+    settingsPanel.addEventListener('mouseenter', () => {
+      isMouseOverUI = true;
+      updateIgnoreMouseState();
+    });
+    settingsPanel.addEventListener('mouseleave', () => {
+      isMouseOverUI = false;
+      updateIgnoreMouseState();
+    });
+  }
 }
 
 function showSpeechBubble(text, durationMs = 3000) {
@@ -410,6 +641,16 @@ function triggerInteraction() {
   animationState.type = 'interact';
   animationState.startTime = Date.now();
 
+  if (mixer) {
+    if (reactAction && idleAction) {
+      reactAction.reset();
+      idleAction.crossFadeTo(reactAction, 0.15, true);
+      reactAction.play();
+    } else if (idleAction) {
+      idleAction.timeScale = 2.0; // speed up single animation
+    }
+  }
+
   const reactions = [
     "Wheee! 🚀",
     "Hold on tight! 🌪️",
@@ -420,6 +661,17 @@ function triggerInteraction() {
   ];
   const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
   showSpeechBubble(randomReaction, 2000);
+
+  // Increment and trigger achievements
+  currentSettings.clickCount = (currentSettings.clickCount || 0) + 1;
+  saveSettingsFile();
+
+  if (currentSettings.clickCount === 1) {
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_WIN_ONE_GAME');
+  }
+  if (currentSettings.clickCount === 10) {
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_WIN_100_GAMES');
+  }
 }
 
 function onWindowResize() {
@@ -504,6 +756,10 @@ function fallbackToProcedural() {
     mixer.stopAllAction();
     mixer = null;
   }
+  idleAction = null;
+  reactAction = null;
+  loadedAnimations = [];
+  availableAnimations = [];
   if (characterGroup) {
     scene.remove(characterGroup);
   }
@@ -563,7 +819,7 @@ function loadCustomModel(filePath) {
       const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
       collisionProxy = new THREE.Mesh(proxyGeom, proxyMat);
       collisionProxy.position.set(0, 0, 0);
-      characterGroup.add(collisionProxy);
+      innerModelGroup.add(collisionProxy);
 
       const padding = 1.35;
       const pixelsPerUnit = 175; // Scale mapping (175 screen pixels per Three.js unit)
@@ -610,10 +866,14 @@ function loadCustomModel(filePath) {
       }
 
       // Load animations
-      if (gltf.animations && gltf.animations.length > 0) {
+      loadedAnimations = gltf.animations || [];
+      availableAnimations = loadedAnimations.map(clip => clip.name || '');
+      
+      idleAction = null;
+      reactAction = null;
+      if (loadedAnimations.length > 0) {
         mixer = new THREE.AnimationMixer(model);
-        const action = mixer.clipAction(gltf.animations[0]);
-        action.play();
+        applySelectedAnimation();
       }
       
       customModelLoaded = true;
@@ -625,6 +885,37 @@ function loadCustomModel(filePath) {
   } catch (err) {
     console.error('Synchronous loader crash:', err);
     fallbackToProcedural();
+  }
+}
+
+function applySelectedAnimation() {
+  if (!mixer) return;
+  
+  mixer.stopAllAction();
+  idleAction = null;
+  reactAction = null;
+  
+  if (currentSettings.activeAnimation === 'none') {
+    console.log('Animation is set to none (static pose).');
+    return;
+  }
+  
+  let targetClip = null;
+  
+  // 1. Try to find clip by name
+  if (currentSettings.activeAnimation !== 'default') {
+    targetClip = loadedAnimations.find(clip => clip.name === currentSettings.activeAnimation);
+  }
+  
+  // 2. Fall back to index 0 if not found, or if default
+  if (!targetClip && loadedAnimations.length > 0) {
+    targetClip = loadedAnimations[0];
+  }
+  
+  if (targetClip) {
+    console.log('Playing active animation loop:', targetClip.name);
+    idleAction = mixer.clipAction(targetClip);
+    idleAction.play();
   }
 }
 
@@ -692,6 +983,9 @@ settingsLeft=false`;
           if (key === 'settingsLeft') currentSettings.settingsLeft = (val === 'true');
           if (key === 'lockPosition') currentSettings.lockPosition = (val === 'true');
           if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
+          if (key === 'activeAnimation') currentSettings.activeAnimation = val || 'default';
+          if (key === 'clickCount') currentSettings.clickCount = parseInt(val, 10) || 0;
+          if (key === 'fontSizeScale') currentSettings.fontSizeScale = parseFloat(val) || 1.0;
         }
       });
       return true;
@@ -722,7 +1016,10 @@ gpuOptimize=${currentSettings.gpuOptimize}
 mouseOptimize=${currentSettings.mouseOptimize}
 settingsLeft=${currentSettings.settingsLeft}
 lockPosition=${currentSettings.lockPosition}
-activeModel=${currentSettings.activeModel}`;
+activeModel=${currentSettings.activeModel}
+activeAnimation=${currentSettings.activeAnimation}
+clickCount=${currentSettings.clickCount}
+fontSizeScale=${currentSettings.fontSizeScale}`;
 
   try {
     fs.writeFileSync(filePath, content, 'utf8');
@@ -753,6 +1050,7 @@ function setupSettingsUI() {
   const settingsLeftCheck = document.getElementById('settings-left');
   const lockPositionCheck = document.getElementById('lock-position');
   const modelSelect = document.getElementById('model-select');
+  const animSelect = document.getElementById('anim-select');
   
   const valWidth = document.getElementById('val-width');
   const valHeight = document.getElementById('val-height');
@@ -761,6 +1059,9 @@ function setupSettingsUI() {
   const valSpeedX = document.getElementById('val-speed-x');
   const valSpeedY = document.getElementById('val-speed-y');
   const valSpeedZ = document.getElementById('val-speed-z');
+  
+  const fontScaleSlider = document.getElementById('font-scale');
+  const valFontScale = document.getElementById('val-font-scale');
 
   // Make gear button visible
   gearBtn.style.display = 'flex';
@@ -779,6 +1080,46 @@ function setupSettingsUI() {
       option.textContent = modelFile;
       modelSelect.appendChild(option);
     });
+  };
+
+  const populateAnimationDropdown = () => {
+    const container = document.getElementById('anim-select-container');
+    if (!animSelect) return;
+    
+    if (modelSelect.value === 'procedural') {
+      animSelect.innerHTML = '<option value="none">Procedural (Default Loop)</option>';
+      animSelect.disabled = true;
+      if (container) container.style.opacity = '0.5';
+      return;
+    }
+    
+    animSelect.disabled = false;
+    if (container) container.style.opacity = '1.0';
+    
+    animSelect.innerHTML = '<option value="none">None (Static Pose)</option>';
+    
+    availableAnimations.forEach((clipName, idx) => {
+      const option = document.createElement('option');
+      const val = clipName || String(idx);
+      option.value = val;
+      option.textContent = clipName ? `${idx + 1}. ${clipName}` : `Animation ${idx + 1}`;
+      animSelect.appendChild(option);
+    });
+    
+    if (currentSettings.activeAnimation === 'default') {
+      if (availableAnimations.length > 0) {
+        animSelect.value = availableAnimations[0] || '0';
+      } else {
+        animSelect.value = 'none';
+      }
+    } else {
+      const exists = availableAnimations.includes(currentSettings.activeAnimation);
+      if (exists) {
+        animSelect.value = currentSettings.activeAnimation;
+      } else {
+        animSelect.value = 'none';
+      }
+    }
   };
 
   populateModelDropdown();
@@ -803,6 +1144,7 @@ function setupSettingsUI() {
     settingsLeftCheck.checked = currentSettings.settingsLeft;
     lockPositionCheck.checked = currentSettings.lockPosition;
     modelSelect.value = currentSettings.activeModel;
+    populateAnimationDropdown();
 
     valWidth.innerText = currentSettings.width;
     valHeight.innerText = currentSettings.height;
@@ -811,9 +1153,28 @@ function setupSettingsUI() {
     valSpeedX.innerText = currentSettings.speedX.toFixed(1);
     valSpeedY.innerText = currentSettings.speedY.toFixed(1);
     valSpeedZ.innerText = currentSettings.speedZ.toFixed(1);
+
+    if (fontScaleSlider) {
+      fontScaleSlider.value = currentSettings.fontSizeScale;
+      valFontScale.innerText = currentSettings.fontSizeScale.toFixed(2);
+    }
+    if (panel) {
+      panel.style.setProperty('--panel-font-scale', currentSettings.fontSizeScale);
+    }
   };
 
   syncSlidersUI();
+
+  modelSelect.addEventListener('change', () => {
+    if (modelSelect.value === 'procedural') {
+      populateAnimationDropdown();
+    } else {
+      animSelect.innerHTML = '<option value="default">Default (Load on Save)</option>';
+      animSelect.disabled = true;
+      const container = document.getElementById('anim-select-container');
+      if (container) container.style.opacity = '0.7';
+    }
+  });
 
   // Listeners that only update the numerical labels live (does not resize window yet)
   widthSlider.addEventListener('input', () => {
@@ -834,6 +1195,16 @@ function setupSettingsUI() {
   speedZSlider.addEventListener('input', () => {
     valSpeedZ.innerText = parseFloat(speedZSlider.value).toFixed(1);
   });
+  
+  if (fontScaleSlider) {
+    fontScaleSlider.addEventListener('input', () => {
+      const scale = parseFloat(fontScaleSlider.value);
+      valFontScale.innerText = scale.toFixed(2);
+      if (panel) {
+        panel.style.setProperty('--panel-font-scale', scale);
+      }
+    });
+  }
 
   // Toggle panel controls (expand or close) to prevent locked window loops
   gearBtn.addEventListener('click', () => {
@@ -887,8 +1258,19 @@ function setupSettingsUI() {
     const modelChanged = (oldModel !== newModel);
     currentSettings.activeModel = newModel;
 
+    if (animSelect) {
+      currentSettings.activeAnimation = animSelect.value;
+    }
+
+    if (fontScaleSlider) {
+      currentSettings.fontSizeScale = parseFloat(fontScaleSlider.value);
+    }
+
     // 2. Save settings to local configuration file
     saveSettingsFile();
+
+    // Trigger settings configuration achievement
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_HEAVY_RADAR');
 
     // Handle model load when changed
     if (modelChanged) {
@@ -896,6 +1278,10 @@ function setupSettingsUI() {
         mixer.stopAllAction();
         mixer = null;
       }
+      idleAction = null;
+      reactAction = null;
+      loadedAnimations = [];
+      availableAnimations = [];
       if (characterGroup) {
         scene.remove(characterGroup);
       }
@@ -909,6 +1295,8 @@ function setupSettingsUI() {
         console.log('Swapping active mascot model to:', fullPath);
         loadCustomModel(fullPath);
       }
+    } else {
+      applySelectedAnimation();
     }
 
     // Apply position shift to the gear button
@@ -988,6 +1376,7 @@ function checkBreakReminders(now) {
     if (!isSettingsOpen && animationState.type !== 'interact') {
       const reminder = breakReminders[Math.floor(Math.random() * breakReminders.length)];
       showSpeechBubble(reminder, 7000);
+      ipcRenderer.send('trigger-steam-achievement', 'ACH_TRAVEL_FAR');
     }
   }
 }
@@ -1013,18 +1402,12 @@ function animate() {
   if (innerModelGroup) {
     if (currentSettings.spinX) {
       innerModelGroup.rotation.x += delta * currentSettings.speedX;
-    } else {
-      innerModelGroup.rotation.x = 0;
     }
     if (currentSettings.spinY) {
       innerModelGroup.rotation.y += delta * currentSettings.speedY;
-    } else {
-      innerModelGroup.rotation.y = 0;
     }
     if (currentSettings.spinZ) {
       innerModelGroup.rotation.z += delta * currentSettings.speedZ;
-    } else {
-      innerModelGroup.rotation.z = 0;
     }
   }
 
@@ -1038,25 +1421,48 @@ function animate() {
       characterGroup.rotation.set(0.08, 0, 0);
       const targetScale = hasSettingsFile ? currentSettings.scale : 1.0;
       characterGroup.scale.set(targetScale, targetScale, targetScale);
+
+      if (mixer) {
+        if (reactAction && idleAction) {
+          idleAction.reset();
+          reactAction.crossFadeTo(idleAction, 0.2, true);
+          idleAction.play();
+        } else if (idleAction) {
+          idleAction.timeScale = 1.0; // reset single animation speed
+        }
+      }
     } else {
-      // Interaction Animation: High Jump & 360 Spin
-      const height = Math.sin(progress * Math.PI) * 1.3;
-      characterGroup.position.y = height;
-
-      // 360-degree spin
-      characterGroup.rotation.y = progress * Math.PI * 2;
-
-      // Squash and stretch transitions relative to base scale
-      const baseScale = hasSettingsFile ? currentSettings.scale : 1.0;
-      if (progress < 0.2) {
-        characterGroup.scale.set(baseScale * 1.15, baseScale * 0.8, baseScale * 1.15);
-      } else if (progress < 0.8) {
-        characterGroup.scale.set(baseScale * 0.9, baseScale * 1.2, baseScale * 0.9);
+      if (customModelLoaded) {
+        // Keep idle floating/bobbing up and down for custom model during interaction state
+        if (currentSettings.bobbing) {
+          characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12;
+          characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
+          characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
+        } else {
+          characterGroup.position.y = 0;
+          characterGroup.rotation.z = 0;
+          characterGroup.rotation.y = 0;
+        }
       } else {
-        const factor = (progress - 0.8) / 0.2;
-        const squashY = 0.75 + (factor * 0.25);
-        const stretchXZ = 1.2 - (factor * 0.2);
-        characterGroup.scale.set(baseScale * stretchXZ, baseScale * squashY, baseScale * stretchXZ);
+        // Interaction Animation: High Jump & 360 Spin (Procedural Mascot Only)
+        const height = Math.sin(progress * Math.PI) * 1.3;
+        characterGroup.position.y = height;
+
+        // 360-degree spin
+        characterGroup.rotation.y = progress * Math.PI * 2;
+
+        // Squash and stretch transitions relative to base scale
+        const baseScale = hasSettingsFile ? currentSettings.scale : 1.0;
+        if (progress < 0.2) {
+          characterGroup.scale.set(baseScale * 1.15, baseScale * 0.8, baseScale * 1.15);
+        } else if (progress < 0.8) {
+          characterGroup.scale.set(baseScale * 0.9, baseScale * 1.2, baseScale * 0.9);
+        } else {
+          const factor = (progress - 0.8) / 0.2;
+          const squashY = 0.75 + (factor * 0.25);
+          const stretchXZ = 1.2 - (factor * 0.2);
+          characterGroup.scale.set(baseScale * stretchXZ, baseScale * squashY, baseScale * stretchXZ);
+        }
       }
     }
   } else {
@@ -1074,13 +1480,13 @@ function animate() {
     // Smooth floating/bobbing up and down (applies to both custom and procedural if enabled)
     if (currentSettings.bobbing) {
       characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12;
+      characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
+      characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
     } else {
       characterGroup.position.y = 0;
+      characterGroup.rotation.z = 0;
+      characterGroup.rotation.y = 0;
     }
-
-    // Subtle looking around (applies to both)
-    characterGroup.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
-    characterGroup.rotation.y = Math.sin(elapsed * 0.4) * 0.04;
   }
 
   renderer.render(scene, camera);

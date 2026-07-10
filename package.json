@@ -8,6 +8,7 @@
     "build": "electron-packager . DesktopPet --platform=win32 --arch=x64 --overwrite"
   },
   "dependencies": {
+    "steamworks.js": "^0.4.0",
     "three": "^0.166.0"
   },
   "devDependencies": {

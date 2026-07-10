@@ -1,0 +1,104 @@
+================================================================================
+PLAN T007: ENGINE SOLUTIONS FOR SINGLE-ANIMATION MASCOT HOSTING
+================================================================================
+
+This document details 3 distinct technical solutions for the desktop mascot
+application to host, render, and execute movement on a single-asset mascot with
+a single animation loop, along with 3 implementation alternatives for each solution.
+
+--------------------------------------------------------------------------------
+1. SOLUTION 1: THREE.JS SKELETAL RIG ENGINE (Engine-Level Mixer)
+--------------------------------------------------------------------------------
+This solution reads skeletal bone-transform tracks embedded directly inside the 3D
+asset file (GLB/GLTF) and plays them using the WebGL clock-based animation player.
+
+* Alternative A: Continuous Background Loop (Current Default)
+  - How it works: The app loads the model, initializes THREE.AnimationMixer,
+    grabs the first clip (gltf.animations[0]), sets it to loop infinitely
+    (THREE.LoopRepeat), and automatically updates it in the render loop.
+  - Pros: High-quality skeletal realism, completely authored by the animator,
+    standard industry format.
+  - Cons: Consistently consumes GPU/CPU cycles even when idle.
+
+* Alternative B: Interactive Trigger-on-Click (Play-Once Reaction)
+  - How it works: The animation is loaded but kept paused (action.paused = true).
+    When the user clicks the pet, the animation plays once (THREE.LoopOnce)
+    as a response/reaction, then fades back to a static pose.
+  - Pros: Saves computational resources when idle, provides high-quality
+    click-response visual feedback.
+  - Cons: Requires the animator to construct both a base pose and a clean return
+    transition.
+
+* Alternative C: User-Configurable Time Scale (Dynamic Playback Speed)
+  - How it works: Bind the mixer update rate (mixer.timeScale) to user settings.
+    A slider in the settings panel allows the user to scale playback speed
+    from 0.0x (frozen) up to 3.0x (hyperactive).
+  - Pros: High customizability; lets users adjust the speed to fit their preference
+    or productivity pace.
+  - Cons: Exposes raw time scales which can look unnatural if set too high.
+
+--------------------------------------------------------------------------------
+2. SOLUTION 2: PROCEDURAL VECTOR ENGINE (Math-Driven Mesh Transform)
+--------------------------------------------------------------------------------
+This solution bypasses skeletal bones entirely. It takes a static, un-rigged 3D
+model and applies matrix transforms (translation, rotation, scale) to the model group
+programmatically inside the update loop.
+
+* Alternative A: Trigonometric Bobbing & Swaying (Idle Floating)
+  - How it works: Calculate the position and rotation offset using sine/cosine
+    waves over elapsed run time (e.g. characterGroup.position.y = Math.sin(elapsed * 1.5) * 0.12).
+  - Pros: Works on any static 3D model with zero bones; uses extremely lightweight
+    CPU/GPU calculations.
+  - Cons: Motion is limited to simple wave cycles and cannot animate individual
+    limbs or faces.
+
+* Alternative B: Procedural Squash and Stretch (Click Interaction)
+  - How it works: On clicking the mascot, apply non-uniform scaling to the mesh
+    to simulate impact squashing and vertical jumping stretching.
+  - Pros: Dynamic, cartoonish response that works on any custom geometry.
+  - Cons: Requires code tuning to prevent mesh clipping into the floor or settings.
+
+* Alternative C: Linear Axis Spinning (Yaw/Pitch/Roll Rotation)
+  - How it works: Continuously increment the X, Y, or Z rotation angles of the inner
+    mesh group based on user-controlled speeds (e.g. innerModelGroup.rotation.y += delta * speed).
+  - Pros: Great for rotating display items or simple spinners.
+  - Cons: Overrides model alignment; can make cursor interaction (raycasting) tricky
+    if the bounding box spins.
+
+--------------------------------------------------------------------------------
+3. SOLUTION 3: DOM CANVAS WRAPPER CONTROLLER (CSS-Based Animation)
+--------------------------------------------------------------------------------
+This solution moves the responsibility of animation out of WebGL and into the
+browser DOM. It animates the HTML <canvas> element or its parent container using CSS.
+
+* Alternative A: CSS Keyframes (GPU-Accelerated Transforms)
+  - How it works: Apply CSS classes with keyframe definitions (e.g., keyframe bobbing
+    from translateY(0) to translateY(-8px)) to the container div.
+  - Pros: Handled directly by the browser's compositor thread (highly efficient,
+    zero WebGL calculation overhead).
+  - Cons: Can only animate the whole window canvas, not individual parts of the 3D model.
+
+* Alternative B: CSS Transitions for State Swapping
+  - How it works: Smoothly transition CSS properties (like opacity, transform: scale(),
+    or filter: drop-shadow()) when changing settings or clicking.
+  - Pros: Very smooth fade-in/fade-out transitions, easy to implement in style sheets.
+  - Cons: Lacks 3D depth; restricted to 2D canvas borders.
+
+* Alternative C: CSS 3D Perspective Transforms
+  - How it works: Rotate or skew the entire canvas container in 3D screen space
+    using CSS properties (e.g. transform: perspective(500px) rotateY(20deg)).
+  - Pros: Creates a pseudo-3D interaction layout separate from Three.js scene coordinates.
+  - Cons: Text and buttons inside the overlay settings panel can become hard to
+    read/interact with when skewed.
+
+--------------------------------------------------------------------------------
+RECOMMENDED IMPLEMENTATION ROADMAP FOR DEVELOPMENT
+--------------------------------------------------------------------------------
+For a feature-rich, high-performance desktop pet companion, we recommend:
+1. Primary Animation: Use Solution 1, Alternative A (Skeletal Loop) to render the
+   mascot's signature idle movements (breathing, tail wagging, winking).
+2. Click Interactions: Combine Solution 1, Alternative B (play reaction skeleton animation)
+   with Solution 2, Alternative B (physical squash-and-stretch translations) for a
+   highly impact-responsive click reaction.
+3. Idle Ambient Floating: Use Solution 2, Alternative A (Math-driven sine bobbing)
+   to move the entire skeletal container group up and down, giving a floating effect.
