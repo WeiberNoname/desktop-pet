@@ -82,6 +82,7 @@ body:hover .settings-btn {
   transform: scale(1);
   transition: opacity 0.25s ease, transform 0.25s ease;
   overflow-y: auto;
+  font-size: calc(13px * var(--panel-font-scale, 1.0));
 }
 
 .settings-panel.hidden {
@@ -91,7 +92,7 @@ body:hover .settings-btn {
 }
 
 .settings-panel h3 {
-  font-size: 14px;
+  font-size: 1.1em;
   margin-bottom: 8px;
   font-weight: 600;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -107,7 +108,7 @@ body:hover .settings-btn {
 }
 
 .setting-item label {
-  font-size: 10.5px;
+  font-size: 0.85em;
   color: #9ca3af;
   display: flex;
   justify-content: space-between;
@@ -145,7 +146,7 @@ body:hover .settings-btn {
 }
 
 .setting-item.checkbox label {
-  font-size: 11.5px;
+  font-size: 0.9em;
   color: #d1d5db;
   cursor: pointer;
 }
@@ -165,7 +166,7 @@ body:hover .settings-btn {
 }
 
 .settings-section h4 {
-  font-size: 10.5px;
+  font-size: 0.85em;
   color: #ff7597;
   margin-bottom: 6px;
   text-transform: uppercase;
@@ -193,7 +194,7 @@ body:hover .settings-btn {
 }
 
 .spin-row label {
-  font-size: 11px;
+  font-size: 0.85em;
   color: #d1d5db;
   width: 45px;
   cursor: pointer;
@@ -219,7 +220,7 @@ body:hover .settings-btn {
 }
 
 .spin-val {
-  font-size: 10px;
+  font-size: 0.8em;
   color: #9ca3af;
   width: 20px;
   text-align: right;
@@ -236,7 +237,7 @@ body:hover .settings-btn {
   padding: 6px;
   border: none;
   border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 0.9em;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
@@ -323,7 +324,7 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   color: #ffffff;
-  font-size: 11.5px;
+  font-size: 0.9em;
   outline: none;
   cursor: pointer;
   transition: border-color 0.2s, background-color 0.2s;
@@ -337,4 +338,31 @@ select:focus {
 select option {
   background: #121212;
   color: #ffffff;
+}
+
+/* Viewport Help Section */
+.help-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.help-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+}
+
+.help-row span {
+  color: #9ca3af;
+}
+
+.help-row strong {
+  color: #ff7597;
+  font-family: monospace;
 }

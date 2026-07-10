@@ -1,5 +1,4 @@
 <img width="400" height="236" alt="Recording 2026-07-04 002226" src="https://github.com/user-attachments/assets/ec017b5e-f488-409f-ae98-e225e1fadb53" />
-(outdated)
 
 
 # 3D Transparent Desktop Mascot Pet 🐰
@@ -56,7 +55,11 @@ Ideal if you want to inspect, debug, or extend the JavaScript source files.
 | :--- | :--- | :--- |
 | **Hover** | Over character | Cursor changes to a pointer, enabling interaction. |
 | **Left Click** | On character | Procedural mascot: plays jump and spin. Custom models: plays animation loop at accelerated speed (no jump). |
-| **Left Click + Drag** | On character | Smoothly repositions the mascot anywhere on your monitor(s). |
+| **Left Click + Drag** | On character | Smoothly repositions the mascot window anywhere on your monitor(s). |
+| **Alt + Left-Drag** (or MMB-Drag) | Anywhere | **Orbit View (3D Rotate):** Changes the 3D view perspective, rotating the pet. |
+| **Shift + Left-Drag** | Anywhere | **Pan View (3D Translate):** Moves the pet model up/down and left/right inside the canvas boundaries. |
+| **Scroll Wheel** (or Ctrl + Left-Drag) | Anywhere | **Zoom View (3D Scale/Depth):** Moves the pet model closer or further away (adjusts Z position). |
+| **Alt + Double-Click** | On mascot | **Reset View:** Instantly centers and resets the model's 3D orientation back to default. |
 | **Click** | Outside character | Passed through to the folders, IDE, or browser behind the window. |
 | **Hover ➔ Click ⚙️** | Left or Right edge | Toggles (Opens or Closes) the glassmorphic Settings Panel. |
 
@@ -89,9 +92,10 @@ You can enable an overlay settings panel by adding a configuration file:
 3. **Editable Settings:**
    - **Active Mascot**: Select between the default procedural bunny and custom models dropped in the `assets/` folder.
    - **Active Animation**: Dynamically lists and plays the model's embedded animation clips, plus a **None (Static Pose)** option to freeze active loops. (Only active when a custom model is loaded).
-   - **Window Width & Height:** Adjust the window dimensions from a minimal **30px** up to your **full computer screen size**.
-   - **Model Scale:** Manually zoom/scale the 3D character from **0.10x** to **5.00x** with ultra-precise **0.01** step increments (10x finer settings precision).
-   - **Enable Idle Bobbing:** Checkbox to toggle the slow floating vertical idle animation on or off. *Note: Disabling bobbing also freezes the subtle rotational waving (looking-around/swaying) of the model.*
+    - **Window Width & Height:** Adjust the window dimensions from a minimal **30px** up to your **full computer screen size**.
+    - **Model Scale:** Manually zoom/scale the 3D character from **0.10x** to **5.00x** with ultra-precise **0.01** step increments (10x finer settings precision).
+    - **Panel Text Size:** Scalable slider from **0.80x** to **2.00x** to dynamically resize all typography inside the settings panel in real-time (ideal for high-resolution monitor readability).
+    - **Enable Idle Bobbing:** Checkbox to toggle the slow floating vertical idle animation on or off. *Note: Disabling bobbing also freezes the subtle rotational waving (looking-around/swaying) of the model.*
    - **Force High-Performance GPU:** Toggle whether the app automatically requests discrete high-speed graphics (NVIDIA/AMD) or stays on integrated defaults (Intel). *(Requires restart to apply)*.
    - **Seamless Performance Mode:** Toggle between Seamless Mode (60Hz raycast throttling and simple bounding boxes) and Precise Mode (full recursive triangle raycasting at raw mouse coordinates).
    - **Place Settings Icon on Left:** Checkbox to shift the gear button `⚙️` position to the top-left margin instead of the top-right margin.

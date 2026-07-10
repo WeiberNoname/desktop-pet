@@ -1,0 +1,258 @@
+================================================================================
+PLAN T009: REAL-WORLD PATTERN REPLICATION & BLENDER-STYLE 3D NAVIGATION
+================================================================================
+
+This document details:
+1. 5 creative concepts to enhance user engagement through realistic pattern replication,
+   including a FIFA-style collectible chemistry mechanics concept.
+2. 3 distinct technical alternatives to implement mouse-driven Blender-style 
+   navigation (orbit, pan, and zoom) for custom mascot view perspectives.
+
+================================================================================
+PART 1: 5 CREATIVE CONCEPTS FOR ENGAGEMENT & PATTERN REPLICATION
+================================================================================
+
+--------------------------------------------------------------------------------
+1. CONCEPT 1: ULTIMATE COMPANION CARDS & CHEMISTRY (FIFA-RELATED ALTERNATIVE)
+--------------------------------------------------------------------------------
+This concept replicates the collectors' loop, ratings system, and synergy matching
+of professional football team builders (like FIFA Ultimate Team) into the desktop
+pet ecosystem.
+
+* How it works:
+  - Collectible Cards: The settings panel includes a "Card Deck" view. Every loaded 
+    mascot (standard or custom GLB) is assigned a collectible "Player Card" design 
+    (e.g., Bronze, Silver, Gold, or special "Team of the Week" cards) with visible 
+    ratings and statistics (e.g., Energy, Speed, Love, Intellect).
+  - Mascot Packs: Users earn in-game points (by keeping the app active, completing 
+    wellness goals, or clicking the pet) to open virtual "Mascot Packs." These pack 
+    animations reveal new procedural skins, accessory models (hats, soccer shirts, 
+    glasses), or special animation actions.
+  - Squad Chemistry: If the user runs multiple pets (if multiple windows are spawned) 
+    or dresses them in matching accessories (e.g., same club colors), they receive 
+    "Chemistry Links." Higher chemistry unlocks unique cooperative animations, such 
+    as pets passing a 3D soccer ball back and forth, or performing a synchronized celebration.
+
+* Real-World Pattern Replicated:
+  - The human desire for collecting, trading, cataloging (the Panini / Trading Card pattern), 
+    and systemic team-synergy optimization (chemistry).
+
+* Pros & Cons:
+  - Pros: High replay value, extremely addictive progression loop, and viral sharing potential.
+  - Cons: Requires UI screens inside Electron for card displays and pack opening.
+
+--------------------------------------------------------------------------------
+2. CONCEPT 2: ENVIRONMENTAL & WEATHER SYNCHRONICITY (BIOLOGICAL & PHYSICAL SYNC)
+--------------------------------------------------------------------------------
+Replicate the physical changes of the local outdoor climate directly on the user's 
+desktop, binding the pet's behaviors to the real-world weather patterns.
+
+* How it works:
+  - Weather Detection: Query a free geolocation or weather API using Electron's 
+    main process on startup, matching the pet's environment to the user's city.
+  - Weather Adaptation:
+    - Rainy/Stormy: The pet puts on a tiny 3D yellow raincoat/umbrella. Raindrops 
+      splash off its collision capsule, and it enters a "cozy/lazy" sleepy state.
+    - Snowy: The pet shivers, breathes tiny visible steam particles, and can be clicked 
+      to throw a snowball at your cursor.
+    - Sunny/Hot: The pet wears sunglasses, pants, and sits next to a tiny fan.
+  - Circadian Rhythm: Light levels in the pet's WebGL viewport dim at dusk, and tiny 
+    fireflies float around it at night.
+
+* Real-World Pattern Replicated:
+  - The biological adaptability of organisms to their local climate and circadian cycles, 
+    fostering a shared physical connection between user and mascot.
+
+* Pros & Cons:
+  - Pros: Deepens the sense of the pet "co-existing" in the user's actual room.
+  - Cons: Requires an internet connection and external API keys for weather queries.
+
+--------------------------------------------------------------------------------
+3. CONCEPT 3: DESKTOP GRAVITY & ACCIDENTAL PHYSICS (PHYSICAL KINEMATICS)
+--------------------------------------------------------------------------------
+Transform the mascot from a floating visual overlay into an active participant in 
+the desktop's physical coordinate space, subject to gravity and collision bounds.
+
+* How it works:
+  - Gravity Engine: Instead of a static window, the pet's container is pulled downwards 
+    by a virtual gravity force, resting on top of the taskbar or active program windows.
+  - Flinging & Drag: Dragging the pet with the cursor builds velocity. Releasing the mouse 
+    "throws" the pet across the screen. It bounces off screen boundaries (left, right, top) 
+    and lands with a squash-and-stretch impact animation.
+  - Interactive Panic: While airborne or falling, the pet plays a comedic, flailing 
+    animation, and dust particles puff upon hitting the desktop ground.
+  - Taskbar Patrol: The pet walks along the top edge of the Windows taskbar, occasionally 
+    tripping or sitting down on the corner of active apps.
+
+* Real-World Pattern Replicated:
+  - Classical Newtonian mechanics (gravity, velocity, momentum, elastic collisions).
+
+* Pros & Cons:
+  - Pros: Creates a highly interactive, toy-like tactile feedback loop that users can play 
+    with while waiting for compiles or downloads.
+  - Cons: Real-time window positioning at high framerates can lead to window jitter on slower systems.
+
+--------------------------------------------------------------------------------
+4. CONCEPT 4: MIRRORED PRODUCTIVITY & WORK COMPANIONSHIP (BEHAVIORAL REFLECTION)
+--------------------------------------------------------------------------------
+Replicate human labor and concentration patterns, making the pet mirror the user's 
+current focus levels and work style.
+
+* How it works:
+  - Mirror Mode: Electron tracks keyboard and mouse activity levels. If the user is 
+    typing furiously (e.g. coding or writing), the pet spawns a tiny 3D desk/computer 
+    and typing animations, typing in sync with the user.
+  - Tiredness & Coffee: If typing continues uninterrupted for over an hour, the pet's 
+    speed slows down, and it starts yawning or slumping. Clicking it spawns a cup of coffee, 
+    re-energizing it.
+  - Focus Pomodoro: The pet runs a visible Pomodoro timer. During focus times, it works 
+    silently. During break times, it rings a bell, stands up, stretches, walks around the 
+    screen, and pops up speech bubbles suggesting the user drink water or do hand stretches.
+
+* Real-World Pattern Replicated:
+  - The psychological concept of mirroring (mimicry) in human companionship, and the 
+    natural cycle of cognitive focus and fatigue.
+
+* Pros & Cons:
+  - Pros: Actually helps the user's health and productivity; feels like a true partner in work.
+  - Cons: Requires setting up lightweight hook listeners for mouse/keyboard inputs without triggering anti-virus warnings.
+
+--------------------------------------------------------------------------------
+5. CONCEPT 5: FREQUENCY DANCER & AUDIO RESONANCE (ACOUSTIC VIBRATION)
+--------------------------------------------------------------------------------
+Make the pet's movement, energy, and visual effects react dynamically to the audio 
+frequencies and music vibrating through the user's speakers.
+
+* How it works:
+  - Audio Capture: Access system audio output via Electron's WebAudio APIs (with loopback 
+    or microphone permission).
+  - Beat Reactivity: The pet's bobbing speed, vertical jumping, scale pulsation, and 
+    emitted particle effects sync directly to the bass and high notes of the playing audio.
+  - Music Genres:
+    - High-Tempo (EDM/Rock): The pet dances, spins, or plays a tiny air guitar.
+    - Low-Tempo (Lo-Fi/Classical): The pet sways gently, floats, or falls asleep.
+    - Silent: The pet goes back to its standard idle breathing cycles.
+
+* Real-World Pattern Replicated:
+  - The physical resonance of waves (cymatics) and the universal human response of moving 
+    to rhythm and music.
+
+* Pros & Cons:
+  - Pros: Turns the mascot into a gorgeous, dynamic ambient audio visualizer.
+  - Cons: Capturing system audio can require extra permissions or specialized setup on Windows.
+
+
+================================================================================
+PART 2: BLENDER-STYLE 3D NAVIGATION CONTROLS (ORBIT, PAN, ZOOM)
+================================================================================
+To give users full control over the 3D model's orientation, scale, and focus point 
+directly inside the transparent canvas, we propose 3 implementation methods.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE A: THREE.JS ORBITCONTROLS INTEGRATION (CAMERA-CENTRIC TARGET SYSTEM)
+--------------------------------------------------------------------------------
+This solution implements the official `OrbitControls` addon inside `renderer.js`. It
+shifts the Three.js camera around a defined focal target based on mouse coordinates.
+
+* Mouse Interaction Mapping (Blender Sync):
+  - Orbit (Rotate View): Middle Mouse Button (MMB) + Drag.
+  - Pan (Up/Down/Left/Right/Forward/Backward on camera grid): Shift + MMB + Drag.
+  - Zoom (Move Forward/Backward): Scroll Wheel.
+  
+* Electron Integration Flow:
+  1. Detect keydown / mouse events inside the transparent window.
+  2. If the user presses the `Alt` or `Ctrl` key, or interacts with mouse clicks:
+     - IPC fires: `ipcRenderer.send('set-ignore-mouse', false)` to focus mouse on Electron.
+     - Temporarily disable the drag-to-move window logic.
+  3. Feed raw mouse events directly into the `OrbitControls` listener.
+  4. On keyup or mouseleave, re-enable standard click-through and window movement.
+
+* Pros:
+  - Uses standard, highly optimized, and tested camera math out of the box.
+  - Supports automatic easing (damping/inertia) for smooth rotation and movement.
+* Cons:
+  - Camera translation can easily move the mascot outside the bounds of the Electron window
+    (clipping borders) if not hard-constrained.
+  - Requires loading an additional JS module (`three/addons/controls/OrbitControls.js`).
+
+--------------------------------------------------------------------------------
+ALTERNATIVE B: CUSTOM RAW MATRIX TRANSFORMATIONS (MODEL-CENTRIC SYSTEM)
+--------------------------------------------------------------------------------
+Instead of moving the camera, this approach keeps the camera locked and directly
+manipulates the translation matrix of the model's outer group (`characterGroup`).
+
+* Mouse Interaction Mapping (Blender Sync):
+  - Orbit (Rotate View): Left Click + Mouse Drag while holding `Alt` (adjusts model rotation).
+  - Pan (Up/Down/Forward/Backward): Left Click + Mouse Drag while holding `Shift` (adjusts model position).
+  - Zoom (Move Forward/Backward): Mouse Scroll Wheel (adjusts model scale or Z-depth).
+
+* Electron Integration Flow:
+  1. Add native `mousedown`, `mousemove`, `mouseup`, and `wheel` listeners directly in `renderer.js`.
+  2. When mouse dragging happens:
+     - Check `event.altKey` ➔ Translate coordinates delta to `characterGroup.rotation.y` and `characterGroup.rotation.x`.
+     - Check `event.shiftKey` ➔ Translate coordinates delta to `characterGroup.position.x` and `characterGroup.position.y`.
+     - Check `wheel` event ➔ Translate deltaY to `characterGroup.position.z` (or camera FOV/zoom).
+  3. Ensure no modifier keys are held before allowing normal window-dragging behavior.
+
+* Pros:
+  - Keeps the camera statically centered, preventing model-clipping edge issues.
+  - High degree of code control; does not require third-party OrbitControls dependency.
+* Cons:
+  - Custom camera-aligned math is required: panning up/down and left/right must take the 
+    current rotation of the model into account, or it won't feel aligned with screen coordinates.
+  - Lacks built-in inertia / physics damping out of the box (must be written manually).
+
+--------------------------------------------------------------------------------
+ALTERNATIVE C: TRANSLUCENT OVERLAY GIZMO & HUD SELECTORS (UI-CENTRIC SYSTEM)
+--------------------------------------------------------------------------------
+This solution overlays a Blender-like interactive visual HUD in the corner of the
+window. Users do not need to memorize modifier keys; they interact with buttons.
+
+* Mouse Interaction Mapping (Blender Sync):
+  - Orbit (Rotate View): Left-click and drag inside a visual 3D spherical Coordinate Axis Gizmo.
+  - Pan (Up/Down/Forward/Backward): Left-click and drag on a "Hand" Icon button.
+  - Zoom (Move Forward/Backward): Left-click and drag on a "Magnifying Glass" Icon button.
+
+* Electron Integration Flow:
+  1. Create a transparent HTML HUD layer containing SVGs representing the Orbit sphere, 
+     Hand, and Magnifier.
+  2. Map click-drag listeners to these SVGs inside `renderer.js`.
+  3. As the user drags the mouse inside the SVG bounds:
+     - Sphere ➔ Rotates the 3D model.
+     - Hand ➔ Translates the 3D model camera/position.
+     - Magnifier ➔ Zooms camera in and out.
+  4. Standard raycasting allows mouse clicks to pass through the main canvas area, ensuring the
+     hud buttons only capture mouse input when the cursor is directly over them.
+
+* Pros:
+  - Visually engaging and intuitive; works seamlessly with touchpads and standard mice.
+  - No keyboard combinations required, making it highly accessible.
+* Cons:
+  - Adds constant visual clutter to the screen overlay.
+  - Higher HTML/CSS/JS layer complexity.
+
+
+================================================================================
+RECOMMENDED SELECTION AND ROADMAP
+================================================================================
+To implement a premium 3D desktop pet companion, we recommend:
+
+1. Phase 1 (Model-Centric System):
+   - Implement Alternative B for basic rotation, translation, and zooming, keeping the 
+     project dependencies thin and camera alignment stable.
+
+2. Phase 2 (Key Modifier Gestures & Skeleton/Armature Clarification):
+   - Add keyboard modifier triggers (Alt/Shift) to make the navigation gestures feel exactly 
+     like Blender's default hotkeys.
+   - CLARIFICATION: These navigation gestures (orbit, pan, zoom) DO NOT require the 3D model 
+     to have a built-in skeleton (armature). Because the system manipulates the Three.js 
+     camera or the root model group container directly, it works out-of-the-box on any static 
+     or un-rigged 3D model, as well as rigged ones.
+
+3. Phase 3 (Productivity Mirroring & Posing Utility Clarification):
+   - Implement the productivity mirroring concepts to add immediate functional utility.
+   - CLARIFICATION: The viewport navigation system is designed so that the user can manually 
+     adjust and lock in a new "static view perspective/static style" (e.g. customized camera 
+     angle, position offset, and scale zoom) directly on their desktop. This serves as a 
+     utility to custom-pose the mascot visually, rather than requiring the creator to author 
+     and export an entirely new keyframe animation from a tool like Blender.
