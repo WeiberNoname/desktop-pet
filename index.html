@@ -58,6 +58,11 @@
       <input type="range" id="model-scale" min="0.1" max="5.0" step="0.01" value="1.00">
     </div>
     
+    <div class="setting-item">
+      <label for="font-scale">Panel Text Size: <span id="val-font-scale">1.00</span>x</label>
+      <input type="range" id="font-scale" min="0.8" max="2.0" step="0.05" value="1.00">
+    </div>
+    
     <div class="setting-item checkbox">
       <input type="checkbox" id="model-bobbing" checked>
       <label for="model-bobbing">Enable Idle Bobbing</label>
@@ -103,6 +108,32 @@
           <label for="spin-z">Z Axis</label>
           <input type="range" id="speed-z" min="-5.0" max="5.0" step="0.1" value="1.0">
           <span class="spin-val" id="val-speed-z">1.0</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="settings-section help-section">
+      <h4>🖱️ Viewport Controls (Blender Style)</h4>
+      <div class="help-grid">
+        <div class="help-row">
+          <span>Orbit (Rotate)</span>
+          <strong>MMB (or Alt+Left) Drag</strong>
+        </div>
+        <div class="help-row">
+          <span>Pan (Translate)</span>
+          <strong>Shift + MMB (or Left) Drag</strong>
+        </div>
+        <div class="help-row">
+          <span>Zoom (Depth)</span>
+          <strong>Scroll (or Ctrl + MMB/Left)</strong>
+        </div>
+        <div class="help-row">
+          <span>Orthographic Views</span>
+          <strong>Keys 1 (Front), 3 (Right), 7 (Top)</strong>
+        </div>
+        <div class="help-row">
+          <span>Opposite / Reset</span>
+          <strong>Key 9 (180°) / Key . or F (Reset)</strong>
         </div>
       </div>
     </div>

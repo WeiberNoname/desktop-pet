@@ -32,7 +32,8 @@ let currentSettings = {
   lockPosition: false,
   activeModel: 'procedural',
   activeAnimation: 'default',
-  clickCount: 0
+  clickCount: 0,
+  fontSizeScale: 1.0
 };
 
 let discoveredModels = [];
@@ -55,10 +56,27 @@ function updateGearPosition() {
 let hasSettingsFile = false;
 let isSettingsOpen = false;
 let isMouseOverCharacter = false;
+let isMouseOverUI = false;
 let isDragging = false;
 let dragStartScreenX = 0;
 let dragStartScreenY = 0;
 let dragMoveDistance = 0;
+
+// Navigation States (Blender-style Viewport Orbit/Pan/Zoom)
+let isNavigating = false;
+let navType = 'orbit'; // 'orbit', 'pan', 'zoom'
+let navStartMouseX = 0;
+let navStartMouseY = 0;
+let navStartRotationX = 0;
+let navStartRotationY = 0;
+let navStartTranslationX = 0;
+let navStartTranslationY = 0;
+let navStartTranslationZ = 0;
+
+// Modifier key states for click-through override tracking
+let altKeyHeld = false;
+let shiftKeyHeld = false;
+let ctrlKeyHeld = false;
 
 // Animation state
 let animationState = {
@@ -72,6 +90,11 @@ function init() {
   
   // Load settings configuration file if it exists in assets/
   hasSettingsFile = readSettingsFile();
+
+  const settingsPanel = document.getElementById('settings-panel');
+  if (settingsPanel && currentSettings.fontSizeScale) {
+    settingsPanel.style.setProperty('--panel-font-scale', currentSettings.fontSizeScale);
+  }
 
   // 1. Create Scene
   scene = new THREE.Scene();
@@ -305,7 +328,7 @@ function createMascot() {
   const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
   collisionProxy = new THREE.Mesh(proxyGeom, proxyMat);
   collisionProxy.position.set(0, 0, 0);
-  characterGroup.add(collisionProxy);
+  innerModelGroup.add(collisionProxy);
 
   // Tilt character slightly forward towards camera
   characterGroup.rotation.x = 0.08;
@@ -318,8 +341,46 @@ function setupInteraction() {
   const mouse = new THREE.Vector2();
   let lastRaycastTime = 0;
 
+  function updateIgnoreMouseState() {
+    const shouldFocus = isSettingsOpen || 
+                        isMouseOverCharacter || 
+                        isMouseOverUI || 
+                        isDragging || 
+                        isNavigating || 
+                        altKeyHeld || 
+                        shiftKeyHeld || 
+                        ctrlKeyHeld;
+
+    ipcRenderer.send('set-ignore-mouse', !shouldFocus);
+  }
+
   // Track mouse movements to update window ignore-mouse states
   window.addEventListener('mousemove', (event) => {
+    // Sync modifiers state from direct mouse movement events
+    altKeyHeld = event.altKey;
+    shiftKeyHeld = event.shiftKey;
+    ctrlKeyHeld = event.ctrlKey;
+
+    // Handle model-centric navigation drag updates
+    if (isNavigating) {
+      if (innerModelGroup) {
+        const deltaX = event.clientX - navStartMouseX;
+        const deltaY = event.clientY - navStartMouseY;
+
+        if (navType === 'orbit') {
+          innerModelGroup.rotation.y = navStartRotationY + deltaX * 0.01;
+          innerModelGroup.rotation.x = navStartRotationX + deltaY * 0.01;
+        } else if (navType === 'pan') {
+          innerModelGroup.position.x = navStartTranslationX + deltaX * 0.005;
+          innerModelGroup.position.y = navStartTranslationY - deltaY * 0.005;
+        } else if (navType === 'zoom') {
+          const zPos = navStartTranslationZ - deltaY * 0.01;
+          innerModelGroup.position.z = Math.max(-10.0, Math.min(4.0, zPos));
+        }
+      }
+      return;
+    }
+
     // If user is dragging the window, we don't recalculate raycast or send ignore-mouse toggles
     if (isDragging) {
       const deltaX = event.screenX - dragStartScreenX;
@@ -354,38 +415,84 @@ function setupInteraction() {
       intersects = raycaster.intersectObjects(characterGroup.children, true);
     }
 
-    if (intersects.length > 0 || isSettingsOpen) {
-      if (!isMouseOverCharacter) {
-        isMouseOverCharacter = true;
-        document.body.style.cursor = 'pointer';
-        // Tell main process NOT to ignore mouse events (allows clicks & drags)
-        ipcRenderer.send('set-ignore-mouse', false);
-      }
-    } else {
-      if (isMouseOverCharacter) {
-        isMouseOverCharacter = false;
-        document.body.style.cursor = 'default';
-        // Tell main process to ignore mouse events (clicks pass through window)
-        ipcRenderer.send('set-ignore-mouse', true);
-      }
+    const raycastHit = (intersects.length > 0);
+    if (raycastHit !== isMouseOverCharacter) {
+      isMouseOverCharacter = raycastHit;
+      document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
     }
+    updateIgnoreMouseState();
   });
 
   window.addEventListener('mousedown', (event) => {
-    if (isSettingsOpen || currentSettings.lockPosition) return;
+    if (isSettingsOpen) return;
+
+    altKeyHeld = event.altKey;
+    shiftKeyHeld = event.shiftKey;
+    ctrlKeyHeld = event.ctrlKey;
+
+    const isMMB = event.button === 1;
+    if (isMMB) {
+      event.preventDefault(); // Prevent Windows auto-scroll popups
+    }
+
+    // Blender MMB mapping rules:
+    // - MMB alone ➔ Orbit
+    // - Shift + MMB ➔ Pan
+    // - Ctrl + MMB ➔ Zoom
+    const isOrbit = event.altKey || (isMMB && !event.shiftKey && !event.ctrlKey);
+    const isPan = event.shiftKey;
+    const isZoom = event.ctrlKey;
+
+    if (isOrbit || isPan || isZoom) {
+      if (innerModelGroup) {
+        isNavigating = true;
+        navType = isOrbit ? 'orbit' : (isPan ? 'pan' : 'zoom');
+        navStartMouseX = event.clientX;
+        navStartMouseY = event.clientY;
+        navStartRotationX = innerModelGroup.rotation.x;
+        navStartRotationY = innerModelGroup.rotation.y;
+        navStartTranslationX = innerModelGroup.position.x;
+        navStartTranslationY = innerModelGroup.position.y;
+        navStartTranslationZ = innerModelGroup.position.z;
+
+        document.body.style.cursor = isOrbit ? 'all-scroll' : (isPan ? 'move' : 'zoom-in');
+        updateIgnoreMouseState();
+      }
+      return;
+    }
+
+    if (currentSettings.lockPosition) return;
     if (isMouseOverCharacter && event.button === 0) { // Left click
       isDragging = true;
       dragStartScreenX = event.screenX;
       dragStartScreenY = event.screenY;
       dragMoveDistance = 0;
       document.body.style.cursor = 'grabbing';
+      updateIgnoreMouseState();
     }
   });
 
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (event) => {
+    altKeyHeld = event.altKey;
+    shiftKeyHeld = event.shiftKey;
+    ctrlKeyHeld = event.ctrlKey;
+
+    const isMMB = event.button === 1;
+    if (isMMB) {
+      event.preventDefault();
+    }
+
+    if (isNavigating) {
+      isNavigating = false;
+      document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
+      updateIgnoreMouseState();
+      return;
+    }
+
     if (isDragging) {
       isDragging = false;
       document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
+      updateIgnoreMouseState();
 
       // Treat small drag movements as a simple click
       if (dragMoveDistance < 8) {
@@ -393,6 +500,98 @@ function setupInteraction() {
       }
     }
   });
+
+  // Scroll wheel zooming
+  window.addEventListener('wheel', (event) => {
+    if (isSettingsOpen) return;
+    if (innerModelGroup) {
+      const zoomSpeed = -0.002;
+      const newZ = innerModelGroup.position.z + event.deltaY * zoomSpeed;
+      innerModelGroup.position.z = Math.max(-10.0, Math.min(4.0, newZ));
+    }
+  }, { passive: true });
+
+  // Double-click holding Alt to reset view
+  window.addEventListener('dblclick', (event) => {
+    if (isSettingsOpen) return;
+    if (event.altKey && innerModelGroup) {
+      innerModelGroup.rotation.set(0, 0, 0);
+      innerModelGroup.position.set(0, 0, 0);
+      showSpeechBubble("View reset! 🔄", 1500);
+    }
+  });
+
+  // Keyboard modifiers activation mapping for click-through override
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Alt') altKeyHeld = true;
+    if (event.key === 'Shift') shiftKeyHeld = true;
+    if (event.key === 'Control') ctrlKeyHeld = true;
+    updateIgnoreMouseState();
+
+    // Blender emulated orthographic/perspective view hotkeys
+    if (!isSettingsOpen && innerModelGroup) {
+      const key = event.key;
+      if (key === '1') {
+        innerModelGroup.rotation.set(0, 0, 0);
+        showSpeechBubble("Front View 🐰", 1200);
+      } else if (key === '3') {
+        innerModelGroup.rotation.set(0, Math.PI / 2, 0);
+        showSpeechBubble("Right View ➡️", 1200);
+      } else if (key === '7') {
+        innerModelGroup.rotation.set(Math.PI / 2, 0, 0);
+        showSpeechBubble("Top View ⬇️", 1200);
+      } else if (key === '9') {
+        innerModelGroup.rotation.y += Math.PI;
+        showSpeechBubble("Opposite View 🔄", 1200);
+      } else if (key === '.' || key.toLowerCase() === 'f') {
+        innerModelGroup.rotation.set(0, 0, 0);
+        innerModelGroup.position.set(0, 0, 0);
+        showSpeechBubble("Frame Selected / Reset view 🔄", 1500);
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (event) => {
+    if (event.key === 'Alt') altKeyHeld = false;
+    if (event.key === 'Shift') shiftKeyHeld = false;
+    if (event.key === 'Control') ctrlKeyHeld = false;
+    updateIgnoreMouseState();
+  });
+
+  window.addEventListener('blur', () => {
+    isNavigating = false;
+    altKeyHeld = false;
+    shiftKeyHeld = false;
+    ctrlKeyHeld = false;
+    document.body.style.cursor = 'default';
+    updateIgnoreMouseState();
+  });
+
+  // Track UI hover events to prevent click-through on HTML controls
+  const gearBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+
+  if (gearBtn) {
+    gearBtn.addEventListener('mouseenter', () => {
+      isMouseOverUI = true;
+      updateIgnoreMouseState();
+    });
+    gearBtn.addEventListener('mouseleave', () => {
+      isMouseOverUI = false;
+      updateIgnoreMouseState();
+    });
+  }
+
+  if (settingsPanel) {
+    settingsPanel.addEventListener('mouseenter', () => {
+      isMouseOverUI = true;
+      updateIgnoreMouseState();
+    });
+    settingsPanel.addEventListener('mouseleave', () => {
+      isMouseOverUI = false;
+      updateIgnoreMouseState();
+    });
+  }
 }
 
 function showSpeechBubble(text, durationMs = 3000) {
@@ -620,7 +819,7 @@ function loadCustomModel(filePath) {
       const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
       collisionProxy = new THREE.Mesh(proxyGeom, proxyMat);
       collisionProxy.position.set(0, 0, 0);
-      characterGroup.add(collisionProxy);
+      innerModelGroup.add(collisionProxy);
 
       const padding = 1.35;
       const pixelsPerUnit = 175; // Scale mapping (175 screen pixels per Three.js unit)
@@ -786,6 +985,7 @@ settingsLeft=false`;
           if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
           if (key === 'activeAnimation') currentSettings.activeAnimation = val || 'default';
           if (key === 'clickCount') currentSettings.clickCount = parseInt(val, 10) || 0;
+          if (key === 'fontSizeScale') currentSettings.fontSizeScale = parseFloat(val) || 1.0;
         }
       });
       return true;
@@ -818,7 +1018,8 @@ settingsLeft=${currentSettings.settingsLeft}
 lockPosition=${currentSettings.lockPosition}
 activeModel=${currentSettings.activeModel}
 activeAnimation=${currentSettings.activeAnimation}
-clickCount=${currentSettings.clickCount}`;
+clickCount=${currentSettings.clickCount}
+fontSizeScale=${currentSettings.fontSizeScale}`;
 
   try {
     fs.writeFileSync(filePath, content, 'utf8');
@@ -858,6 +1059,9 @@ function setupSettingsUI() {
   const valSpeedX = document.getElementById('val-speed-x');
   const valSpeedY = document.getElementById('val-speed-y');
   const valSpeedZ = document.getElementById('val-speed-z');
+  
+  const fontScaleSlider = document.getElementById('font-scale');
+  const valFontScale = document.getElementById('val-font-scale');
 
   // Make gear button visible
   gearBtn.style.display = 'flex';
@@ -949,6 +1153,14 @@ function setupSettingsUI() {
     valSpeedX.innerText = currentSettings.speedX.toFixed(1);
     valSpeedY.innerText = currentSettings.speedY.toFixed(1);
     valSpeedZ.innerText = currentSettings.speedZ.toFixed(1);
+
+    if (fontScaleSlider) {
+      fontScaleSlider.value = currentSettings.fontSizeScale;
+      valFontScale.innerText = currentSettings.fontSizeScale.toFixed(2);
+    }
+    if (panel) {
+      panel.style.setProperty('--panel-font-scale', currentSettings.fontSizeScale);
+    }
   };
 
   syncSlidersUI();
@@ -983,6 +1195,16 @@ function setupSettingsUI() {
   speedZSlider.addEventListener('input', () => {
     valSpeedZ.innerText = parseFloat(speedZSlider.value).toFixed(1);
   });
+  
+  if (fontScaleSlider) {
+    fontScaleSlider.addEventListener('input', () => {
+      const scale = parseFloat(fontScaleSlider.value);
+      valFontScale.innerText = scale.toFixed(2);
+      if (panel) {
+        panel.style.setProperty('--panel-font-scale', scale);
+      }
+    });
+  }
 
   // Toggle panel controls (expand or close) to prevent locked window loops
   gearBtn.addEventListener('click', () => {
@@ -1038,6 +1260,10 @@ function setupSettingsUI() {
 
     if (animSelect) {
       currentSettings.activeAnimation = animSelect.value;
+    }
+
+    if (fontScaleSlider) {
+      currentSettings.fontSizeScale = parseFloat(fontScaleSlider.value);
     }
 
     // 2. Save settings to local configuration file
@@ -1176,18 +1402,12 @@ function animate() {
   if (innerModelGroup) {
     if (currentSettings.spinX) {
       innerModelGroup.rotation.x += delta * currentSettings.speedX;
-    } else {
-      innerModelGroup.rotation.x = 0;
     }
     if (currentSettings.spinY) {
       innerModelGroup.rotation.y += delta * currentSettings.speedY;
-    } else {
-      innerModelGroup.rotation.y = 0;
     }
     if (currentSettings.spinZ) {
       innerModelGroup.rotation.z += delta * currentSettings.speedZ;
-    } else {
-      innerModelGroup.rotation.z = 0;
     }
   }
 
