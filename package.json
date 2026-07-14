@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-packager . DesktopPet --platform=win32 --arch=x64 --overwrite"
+    "build": "electron-packager . DesktopPet --platform=win32 --arch=x64 --overwrite && copy steam_appid.txt DesktopPet-win32-x64\\"
   },
   "dependencies": {
     "steamworks.js": "^0.4.0",

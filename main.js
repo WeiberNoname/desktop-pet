@@ -55,10 +55,10 @@ function createWindow() {
 
 // Helper to determine path to settings configuration file inside main process
 function getAssetsPath() {
-  const exeDir = path.dirname(process.execPath);
-  const packagedAssetsPath = path.join(exeDir, 'assets');
-  if (fs.existsSync(packagedAssetsPath)) return packagedAssetsPath;
-  return path.join(process.cwd(), 'assets');
+  if (app.isPackaged) {
+    return path.join(path.dirname(process.execPath), 'assets');
+  }
+  return path.join(app.getAppPath(), 'assets');
 }
 
 function shouldOptimizeGPU() {
@@ -95,7 +95,7 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows', 'true');
 // Conditionally append GPU optimizations based on user preference config
 if (shouldOptimizeGPU()) {
   // Force Electron to request the high-performance dedicated GPU (discrete graphics)
-  app.commandLine.appendSwitch('force_high_performance_gpu', 'true');
+  app.commandLine.appendSwitch('force-high-performance-gpu', 'true');
 
   // Bypass Chromium driver blocklists to ensure hardware acceleration is active
   app.commandLine.appendSwitch('ignore-gpu-blocklist', 'true');
@@ -119,6 +119,11 @@ ipcMain.on('set-ignore-mouse', (event, ignore) => {
   if (mainWindow) {
     mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
   }
+});
+
+// IPC handler to return the assets path synchronously
+ipcMain.on('get-assets-path', (event) => {
+  event.returnValue = getAssetsPath();
 });
 
 // IPC handler to move the window when dragging the character

@@ -1,0 +1,67 @@
+================================================================================
+PLAN T010: LAUNCH AND PERFORMANCE BUG DIAGNOSIS AND CORRECTIONS
+================================================================================
+
+This document outlines the bugs identified in the desktop pet application that
+can cause launch failures or optimization issues, along with their resolutions.
+
+--------------------------------------------------------------------------------
+BUG 1: Double Three.js Module Import / ESM Instance Mismatch
+--------------------------------------------------------------------------------
+* Status: FIXED
+* Location: renderer.js (Line 1)
+* Symptom: The renderer process imports Three.js using a direct relative path:
+  `import * as THREE from './node_modules/three/build/three.module.js';`
+  while GLTFLoader imports 'three' which is resolved via the HTML importmap:
+  `import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';`
+* Impact: In ES Modules, loading Three.js from different specifiers ('three' vs relative path)
+  causes the browser engine to instantiate and load the library twice. This leads to:
+  1. Unnecessary memory consumption and slower page load/startup times.
+  2. Potential runtime errors and prototype mismatches when passing loaded GLTF meshes (instantiated under one Three.js context) to the scene/renderer (running in the other context).
+* Fix: Change the renderer.js import to match the importmap specifier:
+  `import * as THREE from 'three';`
+
+--------------------------------------------------------------------------------
+BUG 2: GPU Optimization Switch Dash-vs-Underscore Switch Typos
+--------------------------------------------------------------------------------
+* Status: FIXED
+* Location: main.js (Line 98)
+* Symptom: The main process appends the GPU optimization switch using underscores:
+  `app.commandLine.appendSwitch('force_high_performance_gpu', 'true');`
+* Impact: Chromium command line switches use hyphens instead of underscores.
+  The switch is ignored by Chromium, preventing the application from actually forcing
+  discrete/high-performance GPU rendering for smooth UI and transparent compositing.
+* Fix: Change the switch to the correct Chromium hyphenated format:
+  `app.commandLine.appendSwitch('force-high-performance-gpu', 'true');`
+
+--------------------------------------------------------------------------------
+BUG 3: Current Working Directory (CWD) Dependency in Path Resolution
+--------------------------------------------------------------------------------
+* Status: FIXED
+* Location: main.js (Line 61) & renderer.js (Line 690)
+* Symptom: Path resolution for the `assets` directory falls back to:
+  `path.join(process.cwd(), 'assets')`
+* Impact: `process.cwd()` resolves to the directory where the terminal or process was spawned,
+  not the application directory. If the app is launched from a desktop shortcut, by another utility,
+  or from a different shell directory, it will resolve to the wrong path. The application will
+  fail to find existing settings and custom models, and attempt to create a new empty assets directory,
+  leading to launch failures or lost configuration settings.
+* Fix: Expose a synchronous IPC message `get-assets-path` from the main process.
+  The main process resolves the assets path using `app.getAppPath()` (in dev mode) and
+  `process.execPath` (when packaged), which are highly robust and independent of the CWD.
+  The renderer process queries the main process synchronously via `ipcRenderer.sendSync('get-assets-path')`
+  to guarantee matching, correct file paths.
+
+--------------------------------------------------------------------------------
+BUG 4: Missing steam_appid.txt in Packaged Directory Root
+--------------------------------------------------------------------------------
+* Status: FIXED
+* Location: package.json (Build scripts) & steam_appid.txt
+* Symptom: When packaging the application, the `steam_appid.txt` file is placed in the root folder but
+  is not copied to the root of the output directory `DesktopPet-win32-x64/` (next to `DesktopPet.exe`).
+* Impact: When the user launches the packaged executable directly (not via Steam client context),
+  the native Steamworks binary looks for `steam_appid.txt` in the executable's folder. If missing,
+  steamworks.js fails to initialize, or attempts to relaunch the application under Steam, causing
+  the application to hang or fail to start.
+* Fix: Add a post-build command in package.json to copy `steam_appid.txt` to the packaged folder root:
+  `copy steam_appid.txt DesktopPet-win32-x64\\`
