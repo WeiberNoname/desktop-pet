@@ -1,0 +1,99 @@
+================================================================================
+PLAN T014: 3D DESKTOP PET STEAM ACHIEVEMENTS MANUAL
+================================================================================
+
+This document details the Steam achievements currently wired inside the 3D Desktop
+Pet application, how they map to Steamworks testing structures, and how developers
+can build and configure new achievements.
+
+--------------------------------------------------------------------------------
+1. INTRODUCTION: HOW TO BUILD AND INTEGRATE STEAM ACHIEVEMENTS
+--------------------------------------------------------------------------------
+Achievements are built on a dual-layer integration between Valve's Steamworks developer portal and the Electron application:
+
+1. Steamworks Partner Portal Configuration:
+   - Navigate to your App Admin page on Steamworks.
+   - Go to "Stats & Achievements" -> "Achievements".
+   - Define a unique API Name (e.g., `ACH_WIN_ONE_GAME`), set localized Display
+     Names (e.g., "First Pet!"), Descriptions, and upload 256x256 pixel PNG icons
+     (both active/unlocked color and locked/grey versions).
+   - Publish the changes to Steam.
+
+2. Electron Application Code Integration:
+   - Trigger the achievement using the `@skyatnpm/steamworks-js` library.
+   - Check if an achievement is unlocked: `steamClient.userStats.getAchievement(id)`
+   - Unlock the achievement: `steamClient.userStats.setAchievement(id)`
+   - Commit changes to Steam servers: `steamClient.userStats.storeStats()`
+   - Notify the renderer process via IPC to trigger in-app custom notification toasts.
+
+*Note on Testing (App ID 480) - Spacewar Mapping:*
+Because this application is currently configured to run under Valve's public test
+App ID `480` (Spacewar), your active Steam Client and overlay will display Valve's
+official server-side defined Spacewar achievements rather than our custom display names.
+
+Specifically, Steam will show:
+- `ACH_WIN_ONE_GAME` ➔ Displayed on Steam as "Winner" (with Spacewar's gold trophy icon).
+- `ACH_WIN_100_GAMES` ➔ Displayed on Steam as "Interstellar" (with Spacewar's retro spaceship icon).
+- `ACH_HEAVY_RADAR` ➔ Displayed on Steam as "Probing" (with Spacewar's green radar/moon icon).
+- `ACH_TRAVEL_FAR` ➔ Displayed on Steam as "FTL" (with Spacewar's blue warp speed icon).
+- (Additionally, `ACH_WIN_10_GAMES` is "Champion" on Steam, which is a Spacewar achievement but is not currently wired in our pet app's triggers).
+
+Our custom friendly display names ("First Pet!", "Hyperactive Petting!") and emojis are only used inside our internal in-app speech bubble notification toasts. Once you replace the App ID in `steam_appid.txt` with your own unique Steam App ID and configure your achievements in the Steamworks Partner portal, Steam will correctly display your custom names, descriptions, and uploaded PNG icons!
+
+--------------------------------------------------------------------------------
+2. CURRENT ACTIVE ACHIEVEMENTS LIST
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Achievement 1: First Pet!
+--------------------------------------------------------------------------------
+* API Name: `ACH_WIN_ONE_GAME`
+* Display Name: "First Pet! 🐹"
+* Icon: 🐹 (Hamster Face)
+* Purpose: Welcomes the user to their companion app.
+* Trigger Condition: Click or pet the mascot once.
+* Implementation Trigger: Fired in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L678-L680) when `clickCount === 1`.
+
+--------------------------------------------------------------------------------
+Achievement 2: Hyperactive Petting!
+--------------------------------------------------------------------------------
+* API Name: `ACH_WIN_100_GAMES`
+* Display Name: "Hyperactive Petting! 🚀"
+* Icon: 🚀 (Rocket Ship)
+* Purpose: Rewards active interaction with the pet.
+* Trigger Condition: Click or pet the mascot 10 times.
+* Implementation Trigger: Fired in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L681-L683) when `clickCount === 10`.
+
+--------------------------------------------------------------------------------
+Achievement 3: Configured Companion!
+--------------------------------------------------------------------------------
+* API Name: `ACH_HEAVY_RADAR`
+* Display Name: "Configured Companion! ⚙️"
+* Icon: ⚙️ (Gear Cog)
+* Purpose: Encourages the user to customize their mascot configurations.
+* Trigger Condition: Modify any mascot settings (scale, speed, lock status) and click "Save & Refresh".
+* Implementation Trigger: Fired in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1275-L1277) on Settings Panel save.
+
+--------------------------------------------------------------------------------
+Achievement 4: Healthy Break!
+--------------------------------------------------------------------------------
+* API Name: `ACH_TRAVEL_FAR`
+* Display Name: "Healthy Break! 🧘"
+* Icon: 🧘 (Person in Lotus Position)
+* Purpose: Promotes physical wellness and breaks during usage.
+* Trigger Condition: Keep the companion application running continuously for 20 minutes (1200 seconds) until the posture/hydration reminder displays.
+* Implementation Trigger: Fired in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1376-L1385) when the idle check interval fires.
+
+--------------------------------------------------------------------------------
+3. INACTIVE & PLANNED ACHIEVEMENTS (DRAFT/MOCK STATUS)
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Achievement 5: First Steps (Planned)
+--------------------------------------------------------------------------------
+* API Name: `ACH_FIRST_STEPS` (Mock)
+* Display Name: "First Steps! 🐾"
+* Icon: 🐾 (Paw Prints)
+* Purpose: Acknowledges loading a custom 3D model (.glb/.gltf) from custom assets.
+* Trigger Condition: Custom mascott model loaded from local folder or Steam Workshop.
+* Status: Not yet wired in code. Currently documented in launch notes.

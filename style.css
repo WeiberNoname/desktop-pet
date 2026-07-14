@@ -13,6 +13,10 @@ html, body {
   background-color: transparent !important;
 }
 
+body.steam-overlay-active {
+  background-color: #171a21 !important; /* solid Steam dark background */
+}
+
 #container {
   width: 100%;
   height: 100%;
