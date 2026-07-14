@@ -1,0 +1,67 @@
+================================================================================
+PLAN T011: STEAM LAUNCH PREPARATION & MASCOT SYSTEM EXPANSIONS
+================================================================================
+
+This document details the roadmap and architectural expansions required next
+to transition the 3D Desktop Pet application from a verified, bug-free prototype 
+to a feature-rich, commercially ready Steam release.
+
+--------------------------------------------------------------------------------
+1. STEAMWORKS SYSTEM PREPARATION (PRODUCTION CONFIGURATIONS)
+--------------------------------------------------------------------------------
+To replace the default testing context (Spacewar App ID 480) with the actual 
+production game configuration:
+* App ID Replacements: Swap out `480` for the allocated developer App ID in:
+  - `main.js` (`steamworks.init(YOUR_APP_ID)`)
+  - `steam_appid.txt` (Write `YOUR_APP_ID` to the text file)
+* Steam Cloud Setup: Configure cloud save synchronization path to target the 
+  relative `assets/settings` file (handles window coordinates, scales, active 
+  models/animations, click counts, etc.).
+* Steam Overlay Rule: Configure launch parameters to disable the Steam overlay
+  for transparent window safety, preventing overlay graphic hooks from drawing 
+  solid black backgrounds.
+
+--------------------------------------------------------------------------------
+2. STEAM WORKSHOP INTEGRATION (COMMUNITY MODDING)
+--------------------------------------------------------------------------------
+Expand custom mascot support to scan, display, and load user-generated 3D models 
+subscribed to on Steam Workshop:
+* Workshop Scan Loop: On startup, query the Steamworks API for list of subscribed 
+  Workshop items (GLB/GLTF models).
+* Dynamic Dropdown Population: Load Workshop directories alongside the local 
+  `assets/` folder, adding community-created mascots to the settings panel 
+  selection dropdown.
+* Asset Resolution: Auto-convert downloaded Workshop paths to valid file URLs
+  and route them directly into the GLTFLoader.
+
+--------------------------------------------------------------------------------
+3. INTERACTIVE MOODS & TAMAGOTCHI-STYLE CARE METERS (Friendship Loop)
+--------------------------------------------------------------------------------
+Introduce persistent core needs to increase user engagement and encourage daily 
+interaction with the companion:
+* Need Variables: Store friendship score, hydration check count, hunger, and 
+  energy levels in `assets/settings`.
+* Activity Depletion: Deplete stats gradually over real-world time (saved on exit, 
+  re-calculated on launch based on timestamp offsets).
+* Needs-Based Animations: Swap default idle animations according to need states:
+  - Default: Happy floating/breathing.
+  - Low Energy (< 30): Sleepy/sitting pose.
+  - Low Friendship (< 20): Sad/pouting pose.
+* Petting Interaction: Track high-frequency back-and-forth cursor movement 
+  over the mascot's collision proxy. Register as "petting" to restore affection 
+  and play heart particle animations.
+
+--------------------------------------------------------------------------------
+4. DESKTOP GRAVITY ENGINE & BOUNDARY PHYSICS (Newtonian Mechanics)
+--------------------------------------------------------------------------------
+Transform the mascot window container into an active physics participant in the 
+user's screen space:
+* Screen Boundaries: Constrain the Electron window coordinate bounds to track the 
+  desktop dimensions.
+* Gravity Pull: Apply a downward gravitational constant to pull the mascot to
+  rest directly above the Windows taskbar or active folder frames.
+* Cursor Flinging: Compute cursor velocity vectors during drag-and-drop. 
+  When released, fling the pet window across the screen with bounce decay on 
+  touching desktop edges.
+* Flailing Animation: Trigger a dangling/airborne animation loop whenever the 
+  pet is falling or thrown.
