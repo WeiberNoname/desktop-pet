@@ -2,17 +2,39 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+let isSteamOverlayActive = false;
 let steamClient = null;
 try {
-  const steamworks = require('steamworks.js');
-  steamClient = steamworks.init(480);
-  if (steamClient && steamClient.localUser) {
-    console.log("Steamworks API initialized. Active user:", steamClient.localUser.getSteamName());
-  } else {
-    console.log("Steamworks API initialized successfully (No local user info).");
-  }
+  const { SteamClient } = require('@skyatnpm/steamworks-js');
+  steamClient = new SteamClient();
+  steamClient.init(480).then((success) => {
+    if (success) {
+      console.log("Steamworks API initialized. Active user:", steamClient.friends.getPersonaName());
+      
+      // Register gameOverlayActivated event listener
+      steamClient.on('gameOverlayActivated', (active) => {
+        console.log(`[Steam] Overlay activated: ${active}`);
+        isSteamOverlayActive = active;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (active) {
+            mainWindow.setIgnoreMouseEvents(false);
+            mainWindow.setFullScreen(true);
+            mainWindow.webContents.send('steam-overlay-active', true);
+          } else {
+            mainWindow.setFullScreen(false);
+            mainWindow.setIgnoreMouseEvents(true, { forward: true });
+            mainWindow.webContents.send('steam-overlay-active', false);
+          }
+        }
+      });
+    } else {
+      console.log("Steamworks API failed to initialize (Init returned false).");
+    }
+  }).catch((err) => {
+    console.warn("Steamworks API failed to initialize (Offline Mode):", err.message);
+  });
 } catch (err) {
-  console.warn("Steamworks API failed to initialize (Offline Mode):", err.message);
+  console.warn("Steamworks API failed to load module:", err.message);
 }
 
 let mainWindow;
@@ -46,7 +68,21 @@ function createWindow() {
   // forward: true ensures mouse movements are still tracked inside the window.
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
+  // Repaint invalidator for Steam overlay rendering correctness
+  mainWindow.steamworksRepaintInterval = setInterval(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.webContents.isPainting()) {
+        mainWindow.webContents.invalidate();
+      }
+    } else {
+      clearInterval(mainWindow.steamworksRepaintInterval);
+    }
+  }, 1000 / 60);
+
   mainWindow.on('closed', function () {
+    if (mainWindow && mainWindow.steamworksRepaintInterval) {
+      clearInterval(mainWindow.steamworksRepaintInterval);
+    }
     mainWindow = null;
   });
 }
@@ -104,9 +140,16 @@ if (shouldOptimizeGPU()) {
 // Disable automatic DPI scaling to prevent window enlarging/shrinking when dragging across monitors
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
+// Steam Overlay hooks for Electron
+app.commandLine.appendSwitch('in-process-gpu');
+app.commandLine.appendSwitch('disable-direct-composition');
+
 app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
+  if (steamClient && steamClient.isInitialized) {
+    steamClient.shutdown();
+  }
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -116,6 +159,7 @@ app.on('activate', function () {
 
 // IPC handler to toggle mouse click-through capability
 ipcMain.on('set-ignore-mouse', (event, ignore) => {
+  if (isSteamOverlayActive) return; // Prevent renderer from overriding active overlay focus
   if (mainWindow) {
     mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
   }
@@ -154,10 +198,12 @@ ipcMain.on('resize-window', (event, size) => {
 
 // IPC handler to activate Steam achievements
 ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
-  if (steamClient) {
+  if (steamClient && steamClient.isInitialized) {
     try {
-      if (!steamClient.achievements.isActivated(achievementName)) {
-        steamClient.achievements.activate(achievementName);
+      const isActivated = steamClient.userStats.getAchievement(achievementName);
+      if (!isActivated) {
+        steamClient.userStats.setAchievement(achievementName);
+        steamClient.userStats.storeStats();
         console.log(`[Steam] Achievement activated: ${achievementName}`);
         event.reply('steam-achievement-unlocked', { success: true, name: achievementName, isSteamOnline: true });
       } else {

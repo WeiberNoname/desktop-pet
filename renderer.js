@@ -1,4 +1,4 @@
-import * as THREE from './node_modules/three/build/three.module.js';
+import * as THREE from 'three';
 import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 const { ipcRenderer } = window.require('electron');
@@ -175,6 +175,15 @@ function init() {
       };
       const friendlyName = achievementsInfo[result.name] || result.name;
       showSpeechBubble(`🏆 Achievement Unlocked (Offline):\n${friendlyName}`, 5000);
+    }
+  });
+
+  // Listen for Steam overlay activation from main process
+  ipcRenderer.on('steam-overlay-active', (event, active) => {
+    if (active) {
+      document.body.classList.add('steam-overlay-active');
+    } else {
+      document.body.classList.remove('steam-overlay-active');
     }
   });
 }
@@ -681,13 +690,7 @@ function onWindowResize() {
 }
 
 function getAssetsPath() {
-  const exeDir = path.dirname(process.execPath);
-  const packagedAssetsPath = path.join(exeDir, 'assets');
-  
-  if (fs.existsSync(packagedAssetsPath)) {
-    return packagedAssetsPath;
-  }
-  return path.join(process.cwd(), 'assets');
+  return ipcRenderer.sendSync('get-assets-path');
 }
 
 function scanForModels() {

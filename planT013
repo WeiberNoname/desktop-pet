@@ -1,0 +1,114 @@
+================================================================================
+PLAN T013: RESOLVING STEAM OVERLAY CLICK-THROUGH CONFLICT (MOUSE IGNORE LOCK)
+================================================================================
+
+This document details 3 alternative solutions to resolve the click-through bug
+where clicking inside the Steam Overlay sometimes passes through to the desktop.
+This happens because the hover-detection system in the renderer continues to send
+'set-ignore-mouse' commands during overlay activation, overriding the overlay's
+required interactive window state.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: MAIN PROCESS IPC INTERCEPTION & STATE LOCKING (RECOMMENDED)
+--------------------------------------------------------------------------------
+In the main process (`main.js`), we maintain a state variable `isSteamOverlayActive`.
+When the Steam Overlay is active, the main process intercepts all incoming
+`set-ignore-mouse` IPC messages from the renderer and ignores them, locking the
+window's mouse ignore state to `false`.
+
+* Implementation Details:
+  1. Main State tracking in `main.js`:
+     ```javascript
+     let isSteamOverlayActive = false;
+     
+     steamClient.on('gameOverlayActivated', (active) => {
+       isSteamOverlayActive = active;
+       if (active) {
+         mainWindow.setIgnoreMouseEvents(false);
+         mainWindow.setFullScreen(true);
+         mainWindow.webContents.send('steam-overlay-active', true);
+       } else {
+         mainWindow.setFullScreen(false);
+         mainWindow.setIgnoreMouseEvents(true, { forward: true });
+         mainWindow.webContents.send('steam-overlay-active', false);
+       }
+     });
+     ```
+  2. Guard in `set-ignore-mouse` handler:
+     ```javascript
+     ipcMain.on('set-ignore-mouse', (event, ignore) => {
+       if (isSteamOverlayActive) return; // Prevent renderer from overriding active overlay focus
+       if (mainWindow) {
+         mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
+       }
+     });
+     ```
+* Pros:
+  - Centralized entirely in the main process, making it very robust against renderer crashes.
+  - Prevents race conditions at the IPC gateway.
+* Cons:
+  - Renderer still does raycasting calculations in the background (though minimal overhead).
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: RENDERER PROCESS STATE GUARDING
+--------------------------------------------------------------------------------
+In the renderer process (`renderer.js`), we listen to `steam-overlay-active` and
+store a local flag `isSteamOverlayActive`. We then update `updateIgnoreMouseState()`
+to ensure the renderer doesn't request mouse ignore state when the overlay is active.
+
+* Implementation Details:
+  1. Track state in `renderer.js`:
+     ```javascript
+     let isSteamOverlayActive = false;
+     ipcRenderer.on('steam-overlay-active', (event, active) => {
+       isSteamOverlayActive = active;
+       // ... class list toggles ...
+     });
+     ```
+  2. Modify `updateIgnoreMouseState()`:
+     ```javascript
+     function updateIgnoreMouseState() {
+       if (isSteamOverlayActive) {
+         ipcRenderer.send('set-ignore-mouse', false);
+         return;
+       }
+       const shouldFocus = isSettingsOpen || ...;
+       ipcRenderer.send('set-ignore-mouse', !shouldFocus);
+     }
+     ```
+* Pros:
+  - Keeps state machines in both processes aligned and in sync.
+  - Easy to debug renderer-side behavior.
+* Cons:
+  - Requires coordinating changes across IPC boundaries.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: DYNAMIC EVENT LISTENER SUSPENSION
+--------------------------------------------------------------------------------
+Completely detach/remove the window `mousemove` listener when the Steam Overlay is active.
+This halts all hover calculations and avoids sending any IPC messages until the overlay
+is closed.
+
+* Implementation Details:
+  1. Named handler in `renderer.js`:
+     ```javascript
+     function onMouseMove(event) {
+       // ... raycasting and ignore-mouse state updates ...
+     }
+     ```
+  2. Toggling event listener on overlay activation:
+     ```javascript
+     ipcRenderer.on('steam-overlay-active', (event, active) => {
+       if (active) {
+         window.removeEventListener('mousemove', onMouseMove);
+         ipcRenderer.send('set-ignore-mouse', false);
+       } else {
+         window.addEventListener('mousemove', onMouseMove);
+       }
+     });
+     ```
+* Pros:
+  - Saves CPU performance by halting WebGL raycasting while the user is using the overlay.
+  - Simplifies main process code.
+* Cons:
+  - Complex listener lifecycle management inside `renderer.js`.

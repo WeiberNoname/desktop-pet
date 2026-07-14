@@ -1,0 +1,96 @@
+================================================================================
+PLAN T012: ALTERNATIVE SOLUTIONS FOR STEAM OVERLAY TRANSPARENCY CONFLICT
+================================================================================
+
+This document details 3 alternative architectural and configuration solutions
+designed to resolve the conflict between the Steam Overlay (which hooks graphics
+pipelines and can break window alpha channels, drawing solid black backgrounds)
+and the transparent borderless window design of the 3D Desktop Pet.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: DETACHED LAUNCHER WRAPPER (PROCESS SEPARATION)
+--------------------------------------------------------------------------------
+Instead of launching the main transparent desktop pet window directly via Steam,
+the Steam library points to a headless launcher/wrapper. The launcher spawns the
+pet as an independent, detached process.
+
+* Implementation Details:
+  1. Main Executable (`launcher.exe`): A lightweight CLI or hidden Electron process.
+     It initializes the Steamworks API, tracks play time, and runs background tasks.
+  2. Spawning the Pet: The launcher spawns the visual pet process using the
+     detached process settings:
+     ```javascript
+     const { spawn } = require('child_process');
+     const child = spawn('pet.exe', [], {
+       detached: true,
+       stdio: 'ignore'
+     });
+     child.unref();
+     ```
+  3. IPC Communication: The pet and the launcher communicate via Local IPC (e.g.,
+     named pipes, WebSockets, or local files) to sync settings, achievements, and
+     Steam Workshop updates.
+* Pros:
+  - 100% preserves GPU acceleration and WebGL performance for the 3D pet.
+  - Keeps window transparency perfectly intact because the Steam Overlay hook
+    only targets the launcher executable launched by Steam.
+  - Allows full Steamworks integration (playtime, cloud saves, achievements).
+* Cons:
+  - Higher architectural complexity due to multi-process design and IPC syncing.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: DYNAMIC OVERLAY DETECTION & BACKGROUND TOGGLE
+--------------------------------------------------------------------------------
+Instead of completely disabling the Steam Overlay, detect when the user activates
+the Steam Overlay, and temporarily change the window configuration to support the
+overlay.
+
+* Implementation Details:
+  1. Steamworks Event Callback: Listen for the overlay activation callback:
+     ```javascript
+     steamClient.on('gameOverlayActivated', (active) => {
+       if (active) {
+         // Show a solid window background or hide the window to avoid visual bugs
+         mainWindow.webContents.send('steam-overlay-active', true);
+       } else {
+         // Restore full transparent window composition
+         mainWindow.webContents.send('steam-overlay-active', false);
+       }
+     });
+     ```
+  2. Renderer Response: When the overlay is active, the renderer can render a
+     solid backing color (or a cute frame) to contain the overlay interface. When
+     inactive, it restores transparent rendering.
+* Pros:
+  - Keeps full Steam overlay functionality (chat, screenshots, achievements overlay).
+  - Keeps GPU hardware acceleration enabled.
+* Cons:
+  - While the overlay is active, the desktop background is temporarily obscured or
+    the pet is hidden, but this is usually acceptable since the user is in overlay mode.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: SOFTWARE RASTERIZATION FALLBACK (GPU ACCELERATION DISABLED)
+--------------------------------------------------------------------------------
+Forcing Chromium and Electron to bypass the GPU hardware pipeline. Because Steam's
+overlay renderer (`GameOverlayRenderer.dll`) hooks graphics API swap chains
+(DirectX/OpenGL/Vulkan), turning off GPU acceleration prevents the overlay hook from
+loading.
+
+* Implementation Details:
+  1. Command Line Swaps: Append command switches and disable GPU in `main.js` before
+     the application is ready:
+     ```javascript
+     const { app } = require('electron');
+     app.disableHardwareAcceleration();
+     app.commandLine.appendSwitch('disable-gpu');
+     app.commandLine.appendSwitch('disable-software-rasterizer');
+     ```
+  2. Software Rendering: Let the CPU compose the window transparency directly with
+     the Windows Desktop Window Manager (DWM).
+* Pros:
+  - Simple to implement (requires only a few lines in `main.js`).
+  - Keeps the app transparent when launched through Steam with no extra launcher.
+* Cons:
+  - Highly CPU intensive.
+  - Can cause significant lag and low frame rates for 3D graphics (WebGL/Three.js)
+    which depend on GPU hardware acceleration.
