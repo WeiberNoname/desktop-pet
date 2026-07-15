@@ -1,0 +1,81 @@
+================================================================================
+PLAN T016: 3 ALTERNATIVES FOR VISUAL 3D ASSET PREVIEW IN SETTINGS
+================================================================================
+
+This document details three alternative architectures to replace the simple text-based 
+mascot dropdown with a visual selection interface that displays a 3D or 2D preview 
+of the custom mascot models.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: DYNAMIC SECONDARY WEBGL VIEWPORT (LIVE 3D PREVIEW PANEL)
+--------------------------------------------------------------------------------
+
+Render each model in real-time inside a small sub-canvas in the settings panel 
+before the user applies and saves the selection.
+
+* Implementation Details:
+  1. Add a small preview container `<div id="preview-viewport">` inside 
+     [index.html](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/index.html) settings panel.
+  2. In [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js), instantiate an isolated secondary Three.js scene:
+     - `previewScene = new THREE.Scene();`
+     - `previewCamera = new THREE.PerspectiveCamera(...);`
+     - `previewRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });`
+  3. Bind a listener to selection hover/change events. When hovered, load the 
+     corresponding `.glb` file using `GLTFLoader` into `previewScene`.
+  4. Run a separate micro-render loop updating the rotation of `previewScene` 
+     model meshes at 30fps inside the viewport bounds.
+* Pros:
+  - Displays fully interactive, animated, high-fidelity 3D visuals of the mascot.
+  - Shows exactly how the model will look when deployed.
+* Cons:
+  - Higher performance penalty: running two WebGL contexts simultaneously can 
+    increase CPU/GPU usage.
+  - Slower initial loading times for heavy models.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: AUTOMATIC STATIC THUMBNAIL CACHING (SCREENSHOT CAPTURE)
+--------------------------------------------------------------------------------
+
+Automatically capture and cache a PNG thumbnail of the model when it is first 
+loaded or dropped, and display a visual grid of cards in the settings panel.
+
+* Implementation Details:
+  1. Create a hidden subdirectory in the assets folder `assets/.previews/`.
+  2. Replace the dropdown `<select>` element in [index.html](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/index.html) with a card grid 
+     container `<div class="mascot-grid">`.
+  3. When a custom model is loaded in `loadCustomModel()` in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js), 
+     check if `assets/.previews/<modelname>.png` already exists.
+  4. If not, render the model, hide UI overlays for one frame, grab the base64 data 
+     via `renderer.domElement.toDataURL("image/png")`, and save it to the cache directory 
+     using Node `fs.writeFileSync()`.
+  5. Render the settings panel using a grid of cards pointing to the static `.png` images.
+* Pros:
+  - Extremely lightweight: zero runtime WebGL overhead since it displays standard `<img>` tags.
+  - Visually modern grid layout that displays all custom pets at a single glance.
+* Cons:
+  - Requires maintaining a preview cache folder.
+  - The first-time generation of the thumbnail requires loading the model once.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: MOD-STYLE COMPANION ASSET LOADER (MANUAL IMAGES / PLACEHOLDERS)
+--------------------------------------------------------------------------------
+
+Use companion image files stored next to the 3D models (a standard in mod packs and 
+Steam Workshop items, e.g., `companion.glb` and `companion.png`).
+
+* Implementation Details:
+  1. In `scanForModels()` in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js), look for a matching image file name 
+     (e.g., if `rabbit.glb` is scanned, check if `rabbit.png`, `rabbit.jpg`, or `rabbit.webp` 
+     exists in the same directory).
+  2. If a companion image exists, use it as the source for card thumbnails in 
+     the settings panel grid.
+  3. If missing, fall back to showing a generic placeholder image (such as the default 
+     pink bunny mascot graphic).
+  4. Add a "Capture Current View as Icon" button inside settings, allowing users 
+     to generate the companion image manually.
+* Pros:
+  - Safest execution profile: zero automatic renderer hooks needed.
+  - Matches standard Steam Workshop asset directory packaging structures.
+* Cons:
+  - Users must manually provide thumbnails, or settle for placeholder graphics 
+    for custom `.glb` files that lack companion images.

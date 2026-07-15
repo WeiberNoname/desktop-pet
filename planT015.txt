@@ -1,0 +1,121 @@
+================================================================================
+PLAN T015: 3 FRICTIONLESS AND UX-ENHANCING FEATURE IDEAS FOR DESKTOP PET
+================================================================================
+
+This document proposes three high-impact, frictionless feature concepts designed 
+to elevate the user experience of the 3D Desktop Pet companion, describing how 
+they can be integrated into the existing Electron and Three.js architecture.
+
+--------------------------------------------------------------------------------
+1. IDEA 1: DIRECT DRAG-AND-DROP MASCOT IMPORT WITH AUTO-GROUNDING
+--------------------------------------------------------------------------------
+
+* Current State & Friction:
+  To customize the mascot with an external 3D model, the user must manually locate 
+  the local `assets/` folder, drop their `.glb`/`.gltf` model there, and manually 
+  adjust window boundaries and scale sliders in the settings panel to ensure it 
+  fits.
+
+* Proposed Frictionless Feature:
+  1. HTML5 Drag-and-Drop Event Handling:
+     Register drag-and-drop listeners inside the main canvas element in 
+     [index.html](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/index.html) and 
+     [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js). When a `.glb` or `.gltf` file is dragged from Windows Explorer 
+     and dropped directly on the floating pet:
+     - The renderer process automatically captures the file object.
+     - Using Node `fs` (via `ipcRenderer` and `fs.copyFileSync`), the app copies 
+       the file directly to the assets directory (`getAssetsPath()` in 
+       [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L93)).
+     - Trigger `detectAndLoadAsset()` to dynamically load the new model without 
+       restarting the application.
+  2. Bounding-Box Auto-Scale & Auto-Grounding:
+     Instead of relying on manual configuration sliders:
+     - The app calculates the loaded model's bounding box using `THREE.Box3`.
+     - It computes the model's dimensions and automatically sets the camera Z 
+       and model scale coordinates to fit standard viewport bounds.
+     - The system aligns the minimum bounding box Y coordinate (the model's 
+       base/feet) to the bottom-most boundary of the canvas window, ensuring 
+       the mascot rests flush against the desktop taskbar rather than floating 
+       or sinking through the floor.
+  3. Auto-Animation Identifier:
+     Inspect the loaded model's animation clips (`gltf.animations`). If clips 
+     match keyword signatures (e.g., containing "idle", "walk", "jump", or "pet"), 
+     map them to the respective internal application actions automatically.
+
+* Frictionless Impact:
+  Eliminates the need for file manager exploration, manual configuration, or 
+  coordinate slider adjustments. The user drags a file onto the bunny, and it 
+  instantly transforms into the new companion, perfectly proportioned and 
+  standing on the desktop taskbar.
+
+--------------------------------------------------------------------------------
+2. IDEA 2: FRICTIONLESS VIEW-ONLY HOVER MODE
+--------------------------------------------------------------------------------
+
+* Current State & Friction:
+  The companion pet floats statically on top of all other windows. This causes 
+  visual clutter, and the pet can obstruct buttons, links, or text areas in 
+  active applications, forcing the user to repeatedly drag it out of the way.
+
+* Proposed Frictionless Feature:
+  1. View Only Mode Toggle & Shortcut:
+     Add a "View Only Mode" checkbox inside the settings panel (labeled with the 
+     `Ctrl + V` shortcut info). When selected or when pressing `Ctrl + V` on the 
+     keyboard (when not typing inside an input field), the app toggles the value 
+     of `currentSettings.viewOnly` in the configuration file and displays a speech 
+     bubble notification.
+  2. Hover-Triggered Opacity Fade:
+     In [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js), when View Only Mode is active and the user's cursor hovers 
+     over the mascot:
+     - The canvas container (`#container`) and speech bubble smoothly transition 
+       to fully transparent (`opacity = 0.0`) over 0.2 seconds.
+     - The window ignores mouse interactions, allowing click-through events to 
+       be passed straight to whatever folders, links, or text fields are located 
+       directly behind the mascot.
+  3. Cursor Leave Reversion:
+     Once the cursor leaves the mascot's boundaries, the pet and speech bubble 
+     transition back to solid opacity (`1.0`), returning the mascot to its 
+     interactive status.
+
+* Frictionless Impact:
+  Solves the obstruction drawback of "always-on-top" desktop apps in an extremely 
+  simple, lightweight way. The mascot is visible when the screen is idle, but 
+  instantly gets out of the way (fades out and enables pass-through click) the moment 
+  the user starts working or moving the mouse in that region.
+
+--------------------------------------------------------------------------------
+3. IDEA 3: TELEMETRY & AMBIENT ACTIVITY RESPONSE SYSTEM (INTELLIGENT FOCUS)
+--------------------------------------------------------------------------------
+
+* Current State & Friction:
+  Break reminders and speech bubble text are triggered by static timers. They 
+  lack contextual awareness and can interrupt users during critical, focused tasks.
+
+* Proposed Frictionless Feature:
+  1. Keystroke and Mouse Activity Monitoring:
+     - Hook into Electron's `powerMonitor` and check system idle status.
+     - Track active work rhythms. If the user has been typing or clicking 
+       continuously for 45 minutes, the pet yawns, stretches, or sits down 
+       tiredly, serving as a gentle, ambient cue to rest their eyes and hands, 
+       rather than popping up distracting, obstructive dialog boxes.
+  2. Hardware Telemetry Integration:
+     Query system performance stats (CPU/GPU load and temperature) using lightweight 
+     node packages like `systeminformation`:
+     - Low CPU Load: The pet curls up and takes a nap.
+     - Medium CPU Load: The pet walks or plays with a toy.
+     - High CPU Load (e.g., rendering, compiling, gaming): The pet starts running 
+       on a treadmill, fanning itself, or showing sweat drop particles, mirroring 
+       the computer's hard work.
+  3. Ambient Environment Sync:
+     - Local Time and Weather: Query local system time and weather data. 
+       Adjust light directions, colors, and intensities dynamically inside the 
+       Three.js [init](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L88) function to match sunset, sunrise, or night (applying warm 
+       lighting at night).
+     - Desktop Audio Reactivity: Bind the system audio stream to a Three.js 
+       AudioAnalyser. The pet bounces or taps its foot in sync with any music or 
+       videos playing on the computer.
+
+* Frictionless Impact:
+  Transforms the pet from an oblivious animated widget into a responsive, 
+  organic desktop ecosystem companion that mirrors the computer's health, environmental 
+  context, and the user's workload.
