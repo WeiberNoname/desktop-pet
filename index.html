@@ -30,10 +30,12 @@
     <h3>⚙️ Mascot Settings</h3>
     
     <div class="setting-item">
-      <label for="model-select">Active Mascot</label>
-      <select id="model-select">
-        <option value="procedural">Procedural Mascot (Pink Bunny)</option>
-      </select>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <label style="margin-bottom: 0;">Active Mascot</label>
+        <button id="refresh-previews-btn">Refresh Previews 🔄</button>
+      </div>
+      <input type="hidden" id="model-select" value="procedural">
+      <div id="model-select-grid" class="mascot-grid"></div>
     </div>
     
     <div class="setting-item" id="anim-select-container">
@@ -71,6 +73,11 @@
     <div class="setting-item checkbox">
       <input type="checkbox" id="lock-position">
       <label for="lock-position">Lock Mascot Position</label>
+    </div>
+    
+    <div class="setting-item checkbox">
+      <input type="checkbox" id="view-only">
+      <label for="view-only">View Only Mode (Fades on Hover) <span style="font-size: 10px; opacity: 0.7;">(Toggle with Ctrl + V)</span></label>
     </div>
 
     <div class="setting-item checkbox">

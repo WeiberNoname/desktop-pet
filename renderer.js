@@ -30,6 +30,7 @@ let currentSettings = {
   mouseOptimize: true,
   settingsLeft: false,
   lockPosition: false,
+  viewOnly: false,
   activeModel: 'procedural',
   activeAnimation: 'default',
   clickCount: 0,
@@ -58,6 +59,8 @@ let isSettingsOpen = false;
 let isMouseOverCharacter = false;
 let isMouseOverUI = false;
 let isDragging = false;
+let dragStartedOnMascot = false;
+let isDraggingGear = false;
 let dragStartScreenX = 0;
 let dragStartScreenY = 0;
 let dragMoveDistance = 0;
@@ -141,6 +144,9 @@ function init() {
     updateGearPosition();
   }
 
+  // 6.7. Start background generator for missing previews
+  startBackgroundPreviewGenerator();
+
   // 7. Start Animation Loop
   animate();
 
@@ -159,7 +165,8 @@ function init() {
         'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
         'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
         'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
-        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘'
+        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘',
+        'ACH_FIRST_STEPS': 'First Steps! 🐾'
       };
       const friendlyName = achievementsInfo[result.name] || result.name;
       showSpeechBubble(`🏆 Steam Achievement Unlocked:\n${friendlyName}`, 5000);
@@ -171,7 +178,8 @@ function init() {
         'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
         'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
         'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
-        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘'
+        'ACH_TRAVEL_FAR': 'Healthy Break! 🧘',
+        'ACH_FIRST_STEPS': 'First Steps! 🐾'
       };
       const friendlyName = achievementsInfo[result.name] || result.name;
       showSpeechBubble(`🏆 Achievement Unlocked (Offline):\n${friendlyName}`, 5000);
@@ -343,6 +351,11 @@ function createMascot() {
   characterGroup.rotation.x = 0.08;
 
   scene.add(characterGroup);
+
+  // Generate preview thumbnail if missing
+  setTimeout(() => {
+    generateModelPreview('procedural');
+  }, 150);
 }
 
 function setupInteraction() {
@@ -351,8 +364,37 @@ function setupInteraction() {
   let lastRaycastTime = 0;
 
   function updateIgnoreMouseState() {
+    const isHoveringMascot = isMouseOverCharacter && !isSettingsOpen;
+    const isViewOnlyActive = currentSettings.viewOnly && isHoveringMascot;
+
+    // Apply smooth hover transparency transition if view-only is enabled
+    const container = document.getElementById('container');
+    if (container) {
+      if (isViewOnlyActive) {
+        container.style.opacity = '0.0';
+        container.style.transition = 'opacity 0.2s ease';
+      } else {
+        container.style.opacity = '1.0';
+        container.style.transition = 'opacity 0.2s ease';
+      }
+    }
+
+    const bubble = document.getElementById('speech-bubble');
+    if (bubble) {
+      if (isViewOnlyActive) {
+        bubble.style.opacity = '0.0';
+        bubble.style.transition = 'opacity 0.2s ease';
+      } else {
+        bubble.style.opacity = '1.0';
+        bubble.style.transition = 'opacity 0.2s ease';
+      }
+    }
+
+    // When View-Only Mode is active on hover, ignore mouse focus so clicks pass through
+    const effectiveHover = isMouseOverCharacter && !isViewOnlyActive;
+
     const shouldFocus = isSettingsOpen || 
-                        isMouseOverCharacter || 
+                        effectiveHover || 
                         isMouseOverUI || 
                         isDragging || 
                         isNavigating || 
@@ -471,13 +513,30 @@ function setupInteraction() {
     }
 
     if (currentSettings.lockPosition) return;
-    if (isMouseOverCharacter && event.button === 0) { // Left click
-      isDragging = true;
-      dragStartScreenX = event.screenX;
-      dragStartScreenY = event.screenY;
-      dragMoveDistance = 0;
-      document.body.style.cursor = 'grabbing';
-      updateIgnoreMouseState();
+    if (event.button === 0) { // Left click
+      const gearBtn = document.getElementById('settings-btn');
+      const settingsPanel = document.getElementById('settings-panel');
+      
+      const isClickOnGear = gearBtn && gearBtn.contains(event.target);
+      const isClickOnPanel = settingsPanel && settingsPanel.contains(event.target);
+      const isClickOnInteractive = event.target.closest('input, select, button, textarea');
+      
+      const shouldDrag = isMouseOverCharacter || 
+                         isClickOnGear || 
+                         (isClickOnPanel && !isClickOnInteractive);
+                         
+      if (shouldDrag) {
+        isDragging = true;
+        dragStartScreenX = event.screenX;
+        dragStartScreenY = event.screenY;
+        dragMoveDistance = 0;
+        document.body.style.cursor = 'grabbing';
+        
+        dragStartedOnMascot = isMouseOverCharacter;
+        isDraggingGear = isClickOnGear;
+        
+        updateIgnoreMouseState();
+      }
     }
   });
 
@@ -503,8 +562,8 @@ function setupInteraction() {
       document.body.style.cursor = isMouseOverCharacter ? 'pointer' : 'default';
       updateIgnoreMouseState();
 
-      // Treat small drag movements as a simple click
-      if (dragMoveDistance < 8) {
+      // Treat small drag movements as a simple click on the mascot
+      if (dragMoveDistance < 8 && dragStartedOnMascot) {
         triggerInteraction();
       }
     }
@@ -536,6 +595,28 @@ function setupInteraction() {
     if (event.key === 'Shift') shiftKeyHeld = true;
     if (event.key === 'Control') ctrlKeyHeld = true;
     updateIgnoreMouseState();
+
+    // Ctrl + V shortcut to toggle View Only Mode
+    const isCtrlV = event.ctrlKey && (event.key === 'v' || event.key === 'V');
+    if (isCtrlV) {
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+      if (!isTyping) {
+        event.preventDefault();
+        currentSettings.viewOnly = !currentSettings.viewOnly;
+        
+        // Sync setting checkbox in UI
+        const viewOnlyCheck = document.getElementById('view-only');
+        if (viewOnlyCheck) {
+          viewOnlyCheck.checked = currentSettings.viewOnly;
+        }
+        
+        saveSettingsFile();
+        updateIgnoreMouseState();
+        
+        showSpeechBubble(currentSettings.viewOnly ? "View Only Mode: Enabled 👁️" : "View Only Mode: Disabled 🐰", 2500);
+      }
+    }
 
     // Blender emulated orthographic/perspective view hotkeys
     if (!isSettingsOpen && innerModelGroup) {
@@ -601,6 +682,85 @@ function setupInteraction() {
       updateIgnoreMouseState();
     });
   }
+
+  // Handle file drag-and-drop over the Electron window
+  window.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    // Temporarily disable click-through when dragging a file over the window so drop works anywhere
+    ipcRenderer.send('set-ignore-mouse', false);
+  });
+
+  window.addEventListener('dragleave', () => {
+    // Restore normal ignore-mouse status when drag leaves
+    updateIgnoreMouseState();
+  });
+
+  window.addEventListener('drop', (event) => {
+    event.preventDefault();
+    updateIgnoreMouseState();
+
+    const files = event.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const isGlb = file.name.endsWith('.glb');
+    const isGltf = file.name.endsWith('.gltf');
+    if (!isGlb && !isGltf) {
+      showSpeechBubble("Please drop a .glb or .gltf model file! 🐹", 3000);
+      return;
+    }
+
+    const localFilePath = file.path;
+    if (!localFilePath) {
+      showSpeechBubble("Could not read file path 😢", 3000);
+      return;
+    }
+
+    const assetsDir = getAssetsPath();
+    const fileName = path.basename(localFilePath);
+    const destPath = path.join(assetsDir, fileName);
+
+    try {
+      if (!fs.existsSync(assetsDir)) {
+        fs.mkdirSync(assetsDir, { recursive: true });
+      }
+      fs.copyFileSync(localFilePath, destPath);
+    } catch (e) {
+      console.error("Failed to copy dropped file:", e);
+      showSpeechBubble("Failed to import model 😢", 3000);
+      return;
+    }
+
+    showSpeechBubble(`Imported mascot:\n${fileName} 🎉`, 4000);
+    ipcRenderer.send('trigger-steam-achievement', 'ACH_FIRST_STEPS');
+
+    // Load the dropped mascot model
+    if (mixer) {
+      mixer.stopAllAction();
+      mixer = null;
+    }
+    idleAction = null;
+    reactAction = null;
+    loadedAnimations = [];
+    availableAnimations = [];
+    if (characterGroup) {
+      scene.remove(characterGroup);
+    }
+    customModelLoaded = false;
+
+    currentSettings.activeModel = fileName;
+    currentSettings.activeAnimation = 'default';
+    saveSettingsFile();
+
+    const modelSelect = document.getElementById('model-select');
+    if (modelSelect) {
+      populateModelDropdown();
+      modelSelect.value = fileName;
+    }
+
+    loadCustomModel(destPath);
+  });
 }
 
 function showSpeechBubble(text, durationMs = 3000) {
@@ -809,10 +969,14 @@ function loadCustomModel(filePath) {
       // Center model geometry relative to characterGroup pivot
       model.position.set(-center.x, -center.y, -center.z);
       
+      const padding = 1.35;
+
       // Load model at its original size scale (1, 1, 1) without resizing the asset
       const innerGroup = new THREE.Group();
       innerGroup.add(model);
-      innerGroup.position.y = 0; // Vertically center inside our group
+      
+      // Auto-grounding: align model base/feet to the bottom viewport boundary
+      innerGroup.position.y = - size.y * (padding - 1) / 2;
       
       characterGroup.add(innerGroup);
       innerModelGroup = innerGroup;
@@ -824,7 +988,6 @@ function loadCustomModel(filePath) {
       collisionProxy.position.set(0, 0, 0);
       innerModelGroup.add(collisionProxy);
 
-      const padding = 1.35;
       const pixelsPerUnit = 175; // Scale mapping (175 screen pixels per Three.js unit)
 
       if (hasSettingsFile) {
@@ -881,6 +1044,12 @@ function loadCustomModel(filePath) {
       
       customModelLoaded = true;
       console.log('Successfully loaded custom model at original scale:', filePath);
+
+      // Generate thumbnail preview of the custom model
+      const fileName = path.basename(filePath);
+      setTimeout(() => {
+        generateModelPreview(fileName);
+      }, 150);
     }, undefined, (error) => {
       console.error('Failed to load custom GLB/GLTF model:', error);
       fallbackToProcedural();
@@ -910,9 +1079,33 @@ function applySelectedAnimation() {
     targetClip = loadedAnimations.find(clip => clip.name === currentSettings.activeAnimation);
   }
   
-  // 2. Fall back to index 0 if not found, or if default
+  // 2. Auto-detect/identify if "default" is selected or targetClip not found
   if (!targetClip && loadedAnimations.length > 0) {
-    targetClip = loadedAnimations[0];
+    // Find idle clip using keyword matching
+    const idleKeywords = ['idle', 'stay', 'breathe', 'stand', 'look', 'loop', 'default'];
+    targetClip = loadedAnimations.find(clip => {
+      const name = clip.name.toLowerCase();
+      return idleKeywords.some(keyword => name.includes(keyword));
+    });
+    // Fallback to first clip if no idle keyword matched
+    if (!targetClip) {
+      targetClip = loadedAnimations[0];
+    }
+  }
+  
+  // Auto-detect reaction/interact clip using keyword matching
+  if (loadedAnimations.length > 1) {
+    const reactKeywords = ['jump', 'spin', 'click', 'react', 'interact', 'pet', 'wave', 'dance', 'happy'];
+    const reactClip = loadedAnimations.find(clip => {
+      const name = clip.name.toLowerCase();
+      return reactKeywords.some(keyword => name.includes(keyword)) && clip !== targetClip;
+    });
+    if (reactClip) {
+      reactAction = mixer.clipAction(reactClip);
+      reactAction.setLoop(THREE.LoopOnce);
+      reactAction.clampWhenFinished = true;
+      console.log('Auto-detected reaction animation:', reactClip.name);
+    }
   }
   
   if (targetClip) {
@@ -954,7 +1147,9 @@ speedY=1.0
 speedZ=1.0
 gpuOptimize=true
 mouseOptimize=true
-settingsLeft=false`;
+settingsLeft=false
+lockPosition=false
+viewOnly=false`;
       fs.writeFileSync(filePath, defaultContent, 'utf8');
       console.log('Created default settings file at:', filePath);
     } catch (e) {
@@ -985,6 +1180,7 @@ settingsLeft=false`;
           if (key === 'mouseOptimize') currentSettings.mouseOptimize = (val !== 'false');
           if (key === 'settingsLeft') currentSettings.settingsLeft = (val === 'true');
           if (key === 'lockPosition') currentSettings.lockPosition = (val === 'true');
+          if (key === 'viewOnly') currentSettings.viewOnly = (val === 'true');
           if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
           if (key === 'activeAnimation') currentSettings.activeAnimation = val || 'default';
           if (key === 'clickCount') currentSettings.clickCount = parseInt(val, 10) || 0;
@@ -1019,6 +1215,7 @@ gpuOptimize=${currentSettings.gpuOptimize}
 mouseOptimize=${currentSettings.mouseOptimize}
 settingsLeft=${currentSettings.settingsLeft}
 lockPosition=${currentSettings.lockPosition}
+viewOnly=${currentSettings.viewOnly}
 activeModel=${currentSettings.activeModel}
 activeAnimation=${currentSettings.activeAnimation}
 clickCount=${currentSettings.clickCount}
@@ -1030,6 +1227,294 @@ fontSizeScale=${currentSettings.fontSizeScale}`;
   } catch (e) {
     console.error('Error writing settings file:', e);
   }
+}
+
+function generateModelPreview(modelKey) {
+  const assetsDir = getAssetsPath();
+  const previewsDir = path.join(assetsDir, '.previews');
+  if (!fs.existsSync(previewsDir)) {
+    try {
+      fs.mkdirSync(previewsDir, { recursive: true });
+    } catch (e) {
+      console.warn("Could not create previews directory:", e);
+    }
+  }
+  const previewPath = path.join(previewsDir, `${modelKey}.png`);
+  
+  if (fs.existsSync(previewPath)) return;
+
+  // Render a frame synchronously onto the canvas back buffer so it's fully painted
+  renderer.render(scene, camera);
+  
+  try {
+    const dataUrl = renderer.domElement.toDataURL("image/png");
+    const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+    fs.writeFileSync(previewPath, base64Data, 'base64');
+    console.log(`Generated thumbnail preview for: ${modelKey}`);
+    
+    // Refresh settings grid view if open
+    populateModelDropdown();
+  } catch (e) {
+    console.warn("Failed to save model preview thumbnail:", e);
+  }
+}
+
+function populateModelDropdown() {
+  scanForModels();
+  const gridContainer = document.getElementById('model-select-grid');
+  const modelSelect = document.getElementById('model-select');
+  if (!gridContainer || !modelSelect) return;
+  
+  gridContainer.innerHTML = '';
+  
+  const options = ['procedural', ...discoveredModels];
+  const assetsDir = getAssetsPath();
+  
+  options.forEach(modelKey => {
+    const card = document.createElement('div');
+    card.className = 'mascot-card';
+    if (currentSettings.activeModel === modelKey) {
+      card.classList.add('selected');
+    }
+    
+    const img = document.createElement('img');
+    img.className = 'mascot-thumbnail';
+    img.dataset.mascot = modelKey; // Bind dataset key for targeted dynamic updates
+    
+    const previewPath = path.join(assetsDir, '.previews', `${modelKey}.png`);
+    if (fs.existsSync(previewPath)) {
+      img.src = pathToFileURL(previewPath).href + "?t=" + Date.now();
+    } else {
+      img.src = './assets/bunny_icon.png';
+    }
+    
+    const label = document.createElement('div');
+    label.className = 'mascot-card-label';
+    label.textContent = modelKey === 'procedural' ? 'Pink Bunny' : modelKey.replace(/\.(glb|gltf)$/i, '');
+    
+    card.appendChild(img);
+    card.appendChild(label);
+    
+    card.addEventListener('click', () => {
+      gridContainer.querySelectorAll('.mascot-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      
+      modelSelect.value = modelKey;
+      modelSelect.dispatchEvent(new Event('change'));
+    });
+    
+    gridContainer.appendChild(card);
+  });
+}
+
+function startBackgroundPreviewGenerator() {
+  scanForModels();
+  const assetsDir = getAssetsPath();
+  const previewsDir = path.join(assetsDir, '.previews');
+  
+  if (!fs.existsSync(previewsDir)) {
+    try {
+      fs.mkdirSync(previewsDir, { recursive: true });
+    } catch (e) {
+      return;
+    }
+  }
+  
+  const allModels = ['procedural', ...discoveredModels];
+  const queue = allModels.filter(modelKey => {
+    const previewPath = path.join(previewsDir, `${modelKey}.png`);
+    return !fs.existsSync(previewPath);
+  });
+  
+  if (queue.length > 0) {
+    console.log(`Starting background preview generator for ${queue.length} models:`, queue);
+    const intervalId = setInterval(() => {
+      if (queue.length === 0) {
+        clearInterval(intervalId);
+        return;
+      }
+      
+      const nextModel = queue.shift();
+      generateMascotPreviewInBackground(nextModel);
+    }, 2000);
+  }
+}
+
+function generateMascotPreviewInBackground(modelKey) {
+  const assetsDir = getAssetsPath();
+  const previewsDir = path.join(assetsDir, '.previews');
+  const previewPath = path.join(previewsDir, `${modelKey}.png`);
+  
+  if (fs.existsSync(previewPath)) return;
+  
+  const originalVisible = characterGroup ? characterGroup.visible : true;
+  
+  if (modelKey === 'procedural') {
+    // Hide active character
+    if (characterGroup) characterGroup.visible = false;
+    
+    const tempGroup = new THREE.Group();
+    scene.add(tempGroup);
+    
+    // Recreate procedural bunny meshes locally
+    const bodyGeom = new THREE.SphereGeometry(0.7, 32, 32);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0xff7597 });
+    const body = new THREE.Mesh(bodyGeom, bodyMat);
+    tempGroup.add(body);
+    
+    const eyeGeom = new THREE.SphereGeometry(0.08, 16, 16);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
+    leftEye.position.set(0.2, 0.25, 0.55);
+    tempGroup.add(leftEye);
+    const rightEye = leftEye.clone();
+    rightEye.position.x = -0.2;
+    tempGroup.add(rightEye);
+    
+    const earGeom = new THREE.BoxGeometry(0.18, 0.9, 0.12);
+    const leftEar = new THREE.Mesh(earGeom, bodyMat);
+    leftEar.position.set(0.3, 0.9, 0);
+    leftEar.rotation.z = -0.15;
+    tempGroup.add(leftEar);
+    const rightEar = leftEar.clone();
+    rightEar.position.x = -0.3;
+    rightEar.rotation.z = 0.15;
+    tempGroup.add(rightEar);
+    
+    const noseGeom = new THREE.ConeGeometry(0.06, 0.08, 4);
+    const noseMat = new THREE.MeshBasicMaterial({ color: 0xffb7c5 });
+    const nose = new THREE.Mesh(noseGeom, noseMat);
+    nose.position.set(0, 0.08, 0.68);
+    nose.rotation.x = Math.PI;
+    tempGroup.add(nose);
+    
+    const cheekGeom = new THREE.SphereGeometry(0.09, 16, 16);
+    const cheekMat = new THREE.MeshBasicMaterial({ color: 0xffa3b1 });
+    const leftCheek = new THREE.Mesh(cheekGeom, cheekMat);
+    leftCheek.position.set(0.35, 0.05, 0.55);
+    tempGroup.add(leftCheek);
+    const rightCheek = leftCheek.clone();
+    rightCheek.position.x = -0.35;
+    tempGroup.add(rightCheek);
+    
+    tempGroup.rotation.y = 0.4;
+    tempGroup.rotation.x = 0.08;
+    
+    // Synchronously render to paint buffer
+    renderer.render(scene, camera);
+    
+    try {
+      const dataUrl = renderer.domElement.toDataURL("image/png");
+      const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+      fs.writeFileSync(previewPath, base64Data, 'base64');
+      console.log(`Generated background preview for: procedural`);
+      
+      const imgEl = document.querySelector(`.mascot-thumbnail[data-mascot="procedural"]`);
+      if (imgEl) {
+        imgEl.src = pathToFileURL(previewPath).href + "?t=" + Date.now();
+      }
+    } catch (e) {
+      console.warn("Failed background capture for procedural bunny:", e);
+    }
+    
+    scene.remove(tempGroup);
+    if (characterGroup) characterGroup.visible = originalVisible;
+    
+  } else {
+    // Load custom GLB/GLTF model in background
+    const filePath = path.join(assetsDir, modelKey);
+    let fileUrl = filePath;
+    try {
+      fileUrl = pathToFileURL(filePath).href;
+    } catch (e) {}
+    
+    const loader = new GLTFLoader();
+    loader.load(fileUrl, (gltf) => {
+      const tempModel = gltf.scene;
+      
+      // Hide active character
+      if (characterGroup) characterGroup.visible = false;
+      
+      const tempGroup = new THREE.Group();
+      scene.add(tempGroup);
+      
+      // Center and scale model
+      const box = new THREE.Box3().setFromObject(tempModel);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      
+      tempModel.position.set(-center.x, -center.y, -center.z);
+      
+      const padding = 1.35;
+      const innerGroup = new THREE.Group();
+      innerGroup.add(tempModel);
+      innerGroup.position.y = - size.y * (padding - 1) / 2;
+      tempGroup.add(innerGroup);
+      
+      // Save original camera configuration
+      const origAspect = camera.aspect;
+      const origPos = camera.position.clone();
+      
+      // Set temporary framing camera coordinates
+      const visibleHeight = size.y * padding;
+      const zPos = visibleHeight / (2 * Math.tan((camera.fov * Math.PI) / 360));
+      camera.position.set(0, 0, zPos + (size.z / 2));
+      
+      // Render frame
+      renderer.render(scene, camera);
+      
+      try {
+        const dataUrl = renderer.domElement.toDataURL("image/png");
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+        fs.writeFileSync(previewPath, base64Data, 'base64');
+        console.log(`Generated background preview for custom model: ${modelKey}`);
+        
+        const imgEl = document.querySelector(`.mascot-thumbnail[data-mascot="${modelKey}"]`);
+        if (imgEl) {
+          imgEl.src = pathToFileURL(previewPath).href + "?t=" + Date.now();
+        }
+      } catch (e) {
+        console.warn(`Failed background capture for custom model: ${modelKey}`, e);
+      }
+      
+      // Clean up & Restore
+      scene.remove(tempGroup);
+      camera.aspect = origAspect;
+      camera.position.copy(origPos);
+      camera.updateProjectionMatrix();
+      if (characterGroup) characterGroup.visible = originalVisible;
+      
+    }, undefined, (err) => {
+      console.warn(`Failed to load ${modelKey} for background preview:`, err);
+    });
+  }
+}
+
+function forceRefreshAllPreviews() {
+  const assetsDir = getAssetsPath();
+  const previewsDir = path.join(assetsDir, '.previews');
+  if (fs.existsSync(previewsDir)) {
+    try {
+      const files = fs.readdirSync(previewsDir);
+      files.forEach(file => {
+        const filePath = path.join(previewsDir, file);
+        fs.unlinkSync(filePath);
+      });
+    } catch (e) {
+      console.warn("Could not clear previews folder:", e);
+    }
+  }
+  
+  // Set all grid card images back to the default fallback icon
+  const thumbnails = document.querySelectorAll('.mascot-thumbnail');
+  thumbnails.forEach(img => {
+    img.src = './assets/bunny_icon.png';
+  });
+  
+  // Trigger background preview generator queue to recreate previews offscreen
+  startBackgroundPreviewGenerator();
+  
+  showSpeechBubble("Refreshing mascot thumbnails! 🔄", 2500);
 }
 
 function setupSettingsUI() {
@@ -1052,6 +1537,7 @@ function setupSettingsUI() {
   const mouseOptimizeCheck = document.getElementById('mouse-optimize');
   const settingsLeftCheck = document.getElementById('settings-left');
   const lockPositionCheck = document.getElementById('lock-position');
+  const viewOnlyCheck = document.getElementById('view-only');
   const modelSelect = document.getElementById('model-select');
   const animSelect = document.getElementById('anim-select');
   
@@ -1065,6 +1551,13 @@ function setupSettingsUI() {
   
   const fontScaleSlider = document.getElementById('font-scale');
   const valFontScale = document.getElementById('val-font-scale');
+  
+  const refreshPreviewsBtn = document.getElementById('refresh-previews-btn');
+  if (refreshPreviewsBtn) {
+    refreshPreviewsBtn.addEventListener('click', () => {
+      forceRefreshAllPreviews();
+    });
+  }
 
   // Make gear button visible
   gearBtn.style.display = 'flex';
@@ -1072,18 +1565,6 @@ function setupSettingsUI() {
   // Configure slider limits dynamically based on current screen size
   widthSlider.max = window.screen.width;
   heightSlider.max = window.screen.height;
-
-  // Function to populate model select dropdown options
-  const populateModelDropdown = () => {
-    scanForModels();
-    modelSelect.innerHTML = '<option value="procedural">Procedural Mascot (Pink Bunny)</option>';
-    discoveredModels.forEach(modelFile => {
-      const option = document.createElement('option');
-      option.value = modelFile;
-      option.textContent = modelFile;
-      modelSelect.appendChild(option);
-    });
-  };
 
   const populateAnimationDropdown = () => {
     const container = document.getElementById('anim-select-container');
@@ -1146,6 +1627,7 @@ function setupSettingsUI() {
     mouseOptimizeCheck.checked = currentSettings.mouseOptimize;
     settingsLeftCheck.checked = currentSettings.settingsLeft;
     lockPositionCheck.checked = currentSettings.lockPosition;
+    viewOnlyCheck.checked = currentSettings.viewOnly;
     modelSelect.value = currentSettings.activeModel;
     populateAnimationDropdown();
 
@@ -1211,6 +1693,10 @@ function setupSettingsUI() {
 
   // Toggle panel controls (expand or close) to prevent locked window loops
   gearBtn.addEventListener('click', () => {
+    // If the button was dragged to move the window, do not trigger the click action
+    if (dragMoveDistance >= 8) {
+      return;
+    }
     if (isSettingsOpen) {
       syncSlidersUI();
       closeSettings();
@@ -1255,6 +1741,7 @@ function setupSettingsUI() {
     currentSettings.mouseOptimize = mouseOptimizeCheck.checked;
     currentSettings.settingsLeft = settingsLeftCheck.checked;
     currentSettings.lockPosition = lockPositionCheck.checked;
+    currentSettings.viewOnly = viewOnlyCheck.checked;
 
     const oldModel = currentSettings.activeModel;
     const newModel = modelSelect.value;

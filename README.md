@@ -45,39 +45,37 @@ Ideal if you want to inspect, debug, or extend the JavaScript source files.
 4. Recompile the production executable after modifying code:
    ```bash
    npm run build
-   ```
+   ## 🕹️ Controls & Interaction Guide
 
----
-
-## 🕹️ Controls & Interaction Guide
-
-| Mouse Action | Target | Description |
+| Mouse / Key Action | Target | Description |
 | :--- | :--- | :--- |
 | **Hover** | Over character | Cursor changes to a pointer, enabling interaction. |
 | **Left Click** | On character | Procedural mascot: plays jump and spin. Custom models: plays animation loop at accelerated speed (no jump). |
-| **Left Click + Drag** | On character | Smoothly repositions the mascot window anywhere on your monitor(s). |
+| **Left Click + Drag** | On character / Cog Button / Panel Background | Smoothly repositions the mascot window anywhere on your monitor(s). (Excludes sliders, buttons, or inputs). |
 | **Alt + Left-Drag** (or MMB-Drag) | Anywhere | **Orbit View (3D Rotate):** Changes the 3D view perspective, rotating the pet. |
 | **Shift + Left-Drag** | Anywhere | **Pan View (3D Translate):** Moves the pet model up/down and left/right inside the canvas boundaries. |
 | **Scroll Wheel** (or Ctrl + Left-Drag) | Anywhere | **Zoom View (3D Scale/Depth):** Moves the pet model closer or further away (adjusts Z position). |
 | **Alt + Double-Click** | On mascot | **Reset View:** Instantly centers and resets the model's 3D orientation back to default. |
 | **Click** | Outside character | Passed through to the folders, IDE, or browser behind the window. |
-| **Hover ➔ Click ⚙️** | Left or Right edge | Toggles (Opens or Closes) the glassmorphic Settings Panel. |
+| **Hover ➔ Click ⚙️** | Left or Right edge | Toggles (Opens or Closes) the glassmorphic Settings Panel (bypassed if button is dragged). |
+| **Ctrl + V** | Globally | Toggles **View Only Mode** on/off (only active when not typing inside input fields). |
 
 ---
 
-## 💡 Customize with Your Own 3D Models (Zero-Code Customization)
+## 💡 Customize with Your Own 3D Models (Frictionless Import)
 
-The app automatically detects, centers, and displays any 3D asset you drop in:
+The app automatically detects, centers, and displays any 3D asset:
 
+* **Drag-and-Drop Loader**: Simply drag any `.glb` or `.gltf` file directly from Windows Explorer and drop it onto the pet's window. The app will automatically copy the file into the `assets/` folder and load it immediately.
+* **Auto-Grounding**: Bounding boxes are calculated automatically to scale the mascot and anchor its base/feet flush with the taskbar, preventing floating or clipping.
+* **Auto-Animation Mapping**: Inspects animation clips and automatically maps idle tracks (containing `"idle"`, `"stay"`, `"breathe"`) and click reactions (containing `"jump"`, `"spin"`, `"click"`, `"react"`).
+
+Alternatively, you can manually manage models:
 1. Locate the **`assets/`** folder:
    - Development path: [assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/assets)
    - Executable path: [DesktopPet-win32-x64/assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/DesktopPet-win32-x64/assets)
-2. Drop any **`.glb`** or **`.gltf`** model file (e.g. your favorite Pokémon) into this directory.
-3. Launch the app. The engine will:
-   - **Scan** and read your 3D asset.
-   - **Auto-center and load** the geometry at its original modeled size `(scale: 1, 1, 1)`.
-   - **Auto-fit viewport:** If settings are disabled, the window automatically resizes and the camera repositions itself so the model fits the window perfectly.
-   - **Auto-play** the chosen animation track configured in the settings panel (falls back to the first embedded track).
+2. Drop any **`.glb`** or **`.gltf`** model file into this directory.
+3. Reload or select it inside the Settings Panel.
 4. **Fallback:** If you empty the `assets/` folder, the application immediately falls back to rendering the default pink bunny mascot.
 
 ---
@@ -92,17 +90,16 @@ You can enable an overlay settings panel by adding a configuration file:
 3. **Editable Settings:**
    - **Active Mascot**: Select between the default procedural bunny and custom models dropped in the `assets/` folder.
    - **Active Animation**: Dynamically lists and plays the model's embedded animation clips, plus a **None (Static Pose)** option to freeze active loops. (Only active when a custom model is loaded).
-    - **Window Width & Height:** Adjust the window dimensions from a minimal **30px** up to your **full computer screen size**.
-    - **Model Scale:** Manually zoom/scale the 3D character from **0.10x** to **5.00x** with ultra-precise **0.01** step increments (10x finer settings precision).
-    - **Panel Text Size:** Scalable slider from **0.80x** to **2.00x** to dynamically resize all typography inside the settings panel in real-time (ideal for high-resolution monitor readability).
-    - **Enable Idle Bobbing:** Checkbox to toggle the slow floating vertical idle animation on or off. *Note: Disabling bobbing also freezes the subtle rotational waving (looking-around/swaying) of the model.*
-   - **Force High-Performance GPU:** Toggle whether the app automatically requests discrete high-speed graphics (NVIDIA/AMD) or stays on integrated defaults (Intel). *(Requires restart to apply)*.
-   - **Seamless Performance Mode:** Toggle between Seamless Mode (60Hz raycast throttling and simple bounding boxes) and Precise Mode (full recursive triangle raycasting at raw mouse coordinates).
-   - **Place Settings Icon on Left:** Checkbox to shift the gear button `⚙️` position to the top-left margin instead of the top-right margin.
-   - **Axis Spinning (X, Y, and Z):** Enable continuous rotation spinning on the X, Y, and/or Z axes. Each axis has its own checkbox and a speed slider range from **-5.0 to 5.0**.
-     - *Positive values (0.1 to 5.0):* Spin the mascot clockwise.
-     - *Negative values (-0.1 to -5.0):* Spin the mascot counter-clockwise (reverses direction).
-     - *Zero (0.0):* Halts rotation on that axis.
+   - **Window Width & Height:** Adjust the window dimensions from a minimal **30px** up to your **full computer screen size**.
+   - **Model Scale:** Manually zoom/scale the 3D character from **0.10x** to **5.00x** with ultra-precise **0.01** step increments.
+   - **Panel Text Size:** Scalable slider from **0.80x** to **2.00x** to dynamically resize settings panel typography.
+   - **Enable Idle Bobbing:** Checkbox to toggle the slow floating vertical idle animation.
+   - **View Only Mode**: Enable transparency on hover. When checked (or toggled with `Ctrl + V`), the pet smoothly fades to fully transparent (`opacity = 0.0`) when your mouse enters the area, allowing clicks to pass directly to applications underneath.
+   - **Lock Mascot Position**: Freeze window coordinates to prevent accidental dragging.
+   - **Force High-Performance GPU:** Toggle whether the app automatically requests discrete high-speed graphics. *(Requires restart to apply)*.
+   - **Seamless Performance Mode:** Toggle between Seamless Mode (throttled proxy raycasting) and Precise Mode (full triangle raycasting).
+   - **Place Settings Icon on Left:** Checkbox to shift the gear button `⚙️` position to the top-left margin.
+   - **Axis Spinning (X, Y, and Z):** Enable continuous rotation spinning on the X, Y, and/or Z axes. Each axis has its own checkbox and speed slider.
 4. **Resizing Sync & Revert Rules:**
    - Sliders and select options update only their numerical text labels/values in real-time while dragging/changing in the panel.
    - Changes are applied to the window and model **only when you click "Save & Refresh"**.
