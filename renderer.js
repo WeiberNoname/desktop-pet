@@ -474,6 +474,15 @@ function setupInteraction() {
     updateIgnoreMouseState();
   });
 
+  // Reset character hover state and restore window interactivity when the cursor leaves the viewport
+  window.addEventListener('mouseleave', () => {
+    if (isMouseOverCharacter) {
+      isMouseOverCharacter = false;
+      document.body.style.cursor = 'default';
+      updateIgnoreMouseState();
+    }
+  });
+
   window.addEventListener('mousedown', (event) => {
     if (isSettingsOpen) return;
 
@@ -1124,18 +1133,7 @@ function readSettingsFile() {
   if (fs.existsSync(settingsFile)) filePath = settingsFile;
   else if (fs.existsSync(settingsTxtFile)) filePath = settingsTxtFile;
   
-  // If no settings file exists anywhere on startup, automatically generate a default one
-  if (!filePath) {
-    filePath = settingsFile;
-    if (!fs.existsSync(assetsDir)) {
-      try {
-        fs.mkdirSync(assetsDir, { recursive: true });
-      } catch (e) {
-        console.warn("Could not create assets directory:", e);
-      }
-    }
-    try {
-      const defaultContent = `width=350
+  const defaultContent = `width=350
 height=350
 scale=1.0
 bobbing=true
@@ -1149,8 +1147,26 @@ gpuOptimize=true
 mouseOptimize=true
 settingsLeft=false
 lockPosition=false
-viewOnly=false`;
-      fs.writeFileSync(filePath, defaultContent, 'utf8');
+viewOnly=false
+activeModel=procedural
+activeAnimation=default
+clickCount=0
+fontSizeScale=1.0`;
+
+  // If no settings file exists anywhere on startup, automatically generate a default one
+  if (!filePath) {
+    filePath = settingsFile;
+    if (!fs.existsSync(assetsDir)) {
+      try {
+        fs.mkdirSync(assetsDir, { recursive: true });
+      } catch (e) {
+        console.warn("Could not create assets directory:", e);
+      }
+    }
+    try {
+      const tmpPath = filePath + '.tmp';
+      fs.writeFileSync(tmpPath, defaultContent, 'utf8');
+      fs.renameSync(tmpPath, filePath);
       console.log('Created default settings file at:', filePath);
     } catch (e) {
       console.error('Error creating default settings file:', e);
@@ -1160,36 +1176,74 @@ viewOnly=false`;
   if (filePath && fs.existsSync(filePath)) {
     try {
       const data = fs.readFileSync(filePath, 'utf8');
+      if (!data || data.trim() === '') {
+        throw new Error('Settings file is empty');
+      }
       const lines = data.split('\n');
+      let validKeysParsed = 0;
       lines.forEach(line => {
         const parts = line.split('=');
         if (parts.length === 2) {
           const key = parts[0].trim();
           const val = parts[1].trim();
-          if (key === 'width') currentSettings.width = parseInt(val, 10) || 350;
-          if (key === 'height') currentSettings.height = parseInt(val, 10) || 350;
-          if (key === 'scale') currentSettings.scale = parseFloat(val) || 1.0;
-          if (key === 'bobbing') currentSettings.bobbing = (val !== 'false');
-          if (key === 'spinX') currentSettings.spinX = (val === 'true');
-          if (key === 'spinY') currentSettings.spinY = (val === 'true');
-          if (key === 'spinZ') currentSettings.spinZ = (val === 'true');
-          if (key === 'speedX') currentSettings.speedX = parseFloat(val) || 1.0;
-          if (key === 'speedY') currentSettings.speedY = parseFloat(val) || 1.0;
-          if (key === 'speedZ') currentSettings.speedZ = parseFloat(val) || 1.0;
-          if (key === 'gpuOptimize') currentSettings.gpuOptimize = (val !== 'false');
-          if (key === 'mouseOptimize') currentSettings.mouseOptimize = (val !== 'false');
-          if (key === 'settingsLeft') currentSettings.settingsLeft = (val === 'true');
-          if (key === 'lockPosition') currentSettings.lockPosition = (val === 'true');
-          if (key === 'viewOnly') currentSettings.viewOnly = (val === 'true');
-          if (key === 'activeModel') currentSettings.activeModel = val || 'procedural';
-          if (key === 'activeAnimation') currentSettings.activeAnimation = val || 'default';
-          if (key === 'clickCount') currentSettings.clickCount = parseInt(val, 10) || 0;
-          if (key === 'fontSizeScale') currentSettings.fontSizeScale = parseFloat(val) || 1.0;
+          if (key === 'width') { currentSettings.width = parseInt(val, 10) || 350; validKeysParsed++; }
+          if (key === 'height') { currentSettings.height = parseInt(val, 10) || 350; validKeysParsed++; }
+          if (key === 'scale') { currentSettings.scale = parseFloat(val) || 1.0; validKeysParsed++; }
+          if (key === 'bobbing') { currentSettings.bobbing = (val !== 'false'); validKeysParsed++; }
+          if (key === 'spinX') { currentSettings.spinX = (val === 'true'); validKeysParsed++; }
+          if (key === 'spinY') { currentSettings.spinY = (val === 'true'); validKeysParsed++; }
+          if (key === 'spinZ') { currentSettings.spinZ = (val === 'true'); validKeysParsed++; }
+          if (key === 'speedX') { currentSettings.speedX = parseFloat(val) || 1.0; validKeysParsed++; }
+          if (key === 'speedY') { currentSettings.speedY = parseFloat(val) || 1.0; validKeysParsed++; }
+          if (key === 'speedZ') { currentSettings.speedZ = parseFloat(val) || 1.0; validKeysParsed++; }
+          if (key === 'gpuOptimize') { currentSettings.gpuOptimize = (val !== 'false'); validKeysParsed++; }
+          if (key === 'mouseOptimize') { currentSettings.mouseOptimize = (val !== 'false'); validKeysParsed++; }
+          if (key === 'settingsLeft') { currentSettings.settingsLeft = (val === 'true'); validKeysParsed++; }
+          if (key === 'lockPosition') { currentSettings.lockPosition = (val === 'true'); validKeysParsed++; }
+          if (key === 'viewOnly') { currentSettings.viewOnly = (val === 'true'); validKeysParsed++; }
+          if (key === 'activeModel') { currentSettings.activeModel = val || 'procedural'; validKeysParsed++; }
+          if (key === 'activeAnimation') { currentSettings.activeAnimation = val || 'default'; validKeysParsed++; }
+          if (key === 'clickCount') { currentSettings.clickCount = parseInt(val, 10) || 0; validKeysParsed++; }
+          if (key === 'fontSizeScale') { currentSettings.fontSizeScale = parseFloat(val) || 1.0; validKeysParsed++; }
         }
       });
+      if (validKeysParsed === 0) {
+        throw new Error('No valid keys could be parsed from settings file');
+      }
       return true;
     } catch (e) {
-      console.error('Error reading settings file:', e);
+      console.error('Error reading/parsing settings file. Resetting to defaults:', e);
+      // Reset to safe default settings in memory
+      currentSettings.width = 350;
+      currentSettings.height = 350;
+      currentSettings.scale = 1.0;
+      currentSettings.bobbing = true;
+      currentSettings.spinX = false;
+      currentSettings.spinY = false;
+      currentSettings.spinZ = false;
+      currentSettings.speedX = 1.0;
+      currentSettings.speedY = 1.0;
+      currentSettings.speedZ = 1.0;
+      currentSettings.gpuOptimize = true;
+      currentSettings.mouseOptimize = true;
+      currentSettings.settingsLeft = false;
+      currentSettings.lockPosition = false;
+      currentSettings.viewOnly = false;
+      currentSettings.activeModel = 'procedural';
+      currentSettings.activeAnimation = 'default';
+      currentSettings.clickCount = 0;
+      currentSettings.fontSizeScale = 1.0;
+      
+      // Attempt recovery write
+      try {
+        const tmpPath = filePath + '.tmp';
+        fs.writeFileSync(tmpPath, defaultContent, 'utf8');
+        fs.renameSync(tmpPath, filePath);
+        console.log('Successfully recovered and rewrote settings file from defaults');
+      } catch (err) {
+        console.error('Failed to write recovery settings file:', err);
+      }
+      return true;
     }
   }
   return false;
@@ -1222,10 +1276,12 @@ clickCount=${currentSettings.clickCount}
 fontSizeScale=${currentSettings.fontSizeScale}`;
 
   try {
-    fs.writeFileSync(filePath, content, 'utf8');
-    console.log('Saved settings to file:', filePath);
+    const tmpPath = filePath + '.tmp';
+    fs.writeFileSync(tmpPath, content, 'utf8');
+    fs.renameSync(tmpPath, filePath);
+    console.log('Saved settings atomically to file:', filePath);
   } catch (e) {
-    console.error('Error writing settings file:', e);
+    console.error('Error writing settings file atomically:', e);
   }
 }
 

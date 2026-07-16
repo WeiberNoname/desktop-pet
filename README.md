@@ -129,10 +129,24 @@ While the application code automatically requests high-performance discrete grap
 
 ---
 
+## 🛡️ Robustness Improvements & Bug Fixes
+
+The application includes several advanced fail-safes and stability enhancements:
+
+* **View-Only Mode Directional Interactivity Fix**: Added a window-level `mouseleave` event listener in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L477-L485) to resolve the hover-lock bug where the mascot would remain permanently invisible and click-through when the cursor exited the window from the bottom boundary.
+* **Atomic Settings Writing & Self-Healing State Recovery**: Integrated atomic file-system writes via temporary file staging and synchronous renaming in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1127-L1250). Additionally, built a self-healing parsing system that safely catches configuration corruptions, resets options to default values in memory, and auto-rewrites the config file to recover.
+* **Offline Steamworks Mock Interface**: Added a mock Steam Client helper (`MockSteamClient` in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L5-L35)) that serves as a fallback when Steam is offline, allowing in-app achievement speech bubbles to trigger normally without console exceptions.
+
+---
+
 > [!NOTE]
 > To modify the source scripts, open the project inside your editor and make changes directly in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js) or [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js).
 
-error message:
+---
+
+### ⚠️ PowerShell Build Error Troubleshooting
+If you encounter this error when running the build command in PowerShell:
+```
 npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because running scripts is disabled on this system. For
 more information, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170.
 At line:1 char:1
@@ -140,6 +154,10 @@ At line:1 char:1
 + ~~~
     + CategoryInfo          : SecurityError: (:) [], PSSecurityException
     + FullyQualifiedErrorId : UnauthorizedAccess
+```
 
-> [!NOTE]
-> fix command: Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+You can resolve it by running this command in PowerShell to bypass the policy for the current session:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+```
+Or build from standard Windows command prompt (`cmd`).
