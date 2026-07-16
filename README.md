@@ -129,13 +129,18 @@ While the application code automatically requests high-performance discrete grap
 
 ---
 
-## 🛡️ Robustness Improvements & Bug Fixes
+## 🛡️ Robustness, Diagnostics & Debuggability
 
-The application includes several advanced fail-safes and stability enhancements:
+The application includes several advanced fail-safes, troubleshooting tools, and stability enhancements:
 
-* **View-Only Mode Directional Interactivity Fix**: Added a window-level `mouseleave` event listener in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L477-L485) to resolve the hover-lock bug where the mascot would remain permanently invisible and click-through when the cursor exited the window from the bottom boundary.
-* **Atomic Settings Writing & Self-Healing State Recovery**: Integrated atomic file-system writes via temporary file staging and synchronous renaming in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1127-L1250). Additionally, built a self-healing parsing system that safely catches configuration corruptions, resets options to default values in memory, and auto-rewrites the config file to recover.
-* **Offline Steamworks Mock Interface**: Added a mock Steam Client helper (`MockSteamClient` in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L5-L35)) that serves as a fallback when Steam is offline, allowing in-app achievement speech bubbles to trigger normally without console exceptions.
+* **Sub-Viewport Canvas Margins**: Added a 10px padding constraint on the HTML container and scaled the Three.js viewport accordingly. Wired a DOM event target validation (`event.target.tagName !== 'CANVAS'`) in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L457-L466) to instantly reset hover states and clear click-through when the cursor enters the transparent padding border or exits the window.
+* **Main Process Edge Check Polling**: Runs a 100ms interval polling query inside [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L201-L235) whenever click-through is enabled, checking absolute cursor positions and triggering forced hover exits if the cursor crosses outer window boundaries.
+* **Central Diagnostics Logging**: Introduced a formatted diagnostics trace utility in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L12-L37) that logs startup initialization states, Steamworks connections, IPC requests, and file write histories. Traces are persisted to `assets/diagnostics.log` (with size-limiting self-truncation fallback).
+* **Collapsible Diagnostics UI Console**: Implemented a diagnostics console container inside the Settings Panel with options to refresh and clear system traces.
+* **Developer Mode CLI Option (`--dev`)**: Launching the application with `--dev` (e.g. `DesktopPet.exe --dev`) bypasses click-through opacity toggling, auto-opens Chromium DevTools in detached view, and overlays a red dashed guide border indicating the physical window boundaries.
+* **Config Reset Warnings**: Promoted settings recovery awareness by raising startup warnings (`⚠️ Config File Corrupted:\nDefault settings restored!`) inside the pet's notification speech bubble when settings files healed successfully.
+* **Atomic Settings Writing & Self-Healing State Recovery**: Integrated atomic file-system writes via temporary file staging and synchronous renaming in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1262). Additionally, built a self-healing parsing system that safely catches configuration corruptions, resets options to default values in memory, and auto-rewrites the config file to recover.
+* **Offline Steamworks Mock Interface**: Added a mock Steam Client helper (`MockSteamClient` in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L46-L75)) that serves as a fallback when Steam is offline, allowing in-app achievement speech bubbles to trigger normally without console exceptions.
 
 ---
 

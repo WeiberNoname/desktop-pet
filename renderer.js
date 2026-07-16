@@ -55,6 +55,7 @@ function updateGearPosition() {
   }
 }
 let hasSettingsFile = false;
+let wasConfigHealed = false;
 let isSettingsOpen = false;
 let isMouseOverCharacter = false;
 let isMouseOverUI = false;
@@ -90,6 +91,12 @@ let animationState = {
 
 function init() {
   const container = document.getElementById('container');
+
+  // Query if application is running in developer mode
+  const isDevMode = ipcRenderer.sendSync('is-dev-mode');
+  if (isDevMode) {
+    document.body.classList.add('dev-mode');
+  }
   
   // Load settings configuration file if it exists in assets/
   hasSettingsFile = readSettingsFile();
@@ -104,12 +111,14 @@ function init() {
 
   // 2. Create Camera
   // Using PerspectiveCamera, centered on origin
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  const initialWidth = container.clientWidth || (window.innerWidth - 20);
+  const initialHeight = container.clientHeight || (window.innerHeight - 20);
+  camera = new THREE.PerspectiveCamera(45, initialWidth / initialHeight, 0.1, 100);
   camera.position.set(0, 0, 5.5);
 
   // 3. Create Renderer with full transparency
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(initialWidth, initialHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0); // Completely transparent
   renderer.shadowMap.enabled = true;
@@ -150,9 +159,13 @@ function init() {
   // 7. Start Animation Loop
   animate();
 
-  // Trigger startup greeting speech bubble
+  // Trigger startup greeting speech bubble or config corruption recovery warning
   setTimeout(() => {
-    showSpeechBubble("Hi there! I'm your desktop pet! 🐰✨", 4000);
+    if (wasConfigHealed) {
+      showSpeechBubble("⚠️ Config File Corrupted:\nDefault settings restored!", 6000);
+    } else {
+      showSpeechBubble("Hi there! I'm your desktop pet! 🐰✨", 4000);
+    }
   }, 1800);
 
   // Handle Resize
@@ -192,6 +205,15 @@ function init() {
       document.body.classList.add('steam-overlay-active');
     } else {
       document.body.classList.remove('steam-overlay-active');
+    }
+  });
+
+  // Listen for forced hover exit requests from main process (active polling boundary safety)
+  ipcRenderer.on('force-hover-exit', () => {
+    if (isMouseOverCharacter) {
+      isMouseOverCharacter = false;
+      document.body.style.cursor = 'default';
+      updateIgnoreMouseState();
     }
   });
 }
@@ -442,6 +464,17 @@ function setupInteraction() {
       dragStartScreenY = event.screenY;
 
       ipcRenderer.send('move-window', { x: deltaX, y: deltaY });
+      return;
+    }
+
+    // If the event target is not the rendering canvas, treat it as a hover exit.
+    // This handles both out-of-bounds coordinates and the 10px transparent container padding zone.
+    if (event.target.tagName !== 'CANVAS') {
+      if (isMouseOverCharacter) {
+        isMouseOverCharacter = false;
+        document.body.style.cursor = 'default';
+        updateIgnoreMouseState();
+      }
       return;
     }
 
@@ -853,9 +886,14 @@ function triggerInteraction() {
 }
 
 function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  const container = document.getElementById('container');
+  if (container) {
+    const w = container.clientWidth || (window.innerWidth - 20);
+    const h = container.clientHeight || (window.innerHeight - 20);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  }
 }
 
 function getAssetsPath() {
@@ -1004,9 +1042,11 @@ function loadCustomModel(filePath) {
         characterGroup.scale.set(currentSettings.scale, currentSettings.scale, currentSettings.scale);
 
         // Update WebGL viewports to match settings sizes
-        camera.aspect = currentSettings.width / currentSettings.height;
+        const targetW = currentSettings.width - 20;
+        const targetH = currentSettings.height - 20;
+        camera.aspect = targetW / targetH;
         camera.updateProjectionMatrix();
-        renderer.setSize(currentSettings.width, currentSettings.height);
+        renderer.setSize(targetW, targetH);
 
         // Position camera Z so the custom scaled model fits comfortably
         const visibleHeight = size.y * currentSettings.scale * padding;
@@ -1027,9 +1067,11 @@ function loadCustomModel(filePath) {
         winHeight = Math.max(150, Math.min(800, winHeight));
         
         // Update WebGL viewports
-        camera.aspect = winWidth / winHeight;
+        const targetW = winWidth - 20;
+        const targetH = winHeight - 20;
+        camera.aspect = targetW / targetH;
         camera.updateProjectionMatrix();
-        renderer.setSize(winWidth, winHeight);
+        renderer.setSize(targetW, targetH);
         
         // Position camera Z so the original model size fits comfortably
         const visibleHeight = size.y * padding;
@@ -1213,6 +1255,9 @@ fontSizeScale=1.0`;
       return true;
     } catch (e) {
       console.error('Error reading/parsing settings file. Resetting to defaults:', e);
+      wasConfigHealed = true;
+      ipcRenderer.send('log-diagnostic', `[Config Recovery] Settings file corrupted/empty: ${e.message || e}. Restoring factory defaults and rewriting file.`);
+      
       // Reset to safe default settings in memory
       currentSettings.width = 350;
       currentSettings.height = 350;
@@ -1886,6 +1931,45 @@ function setupSettingsUI() {
 
   gearBtn.addEventListener('mouseenter', disableClickThrough);
   panel.addEventListener('mouseenter', disableClickThrough);
+
+  // Diagnostics & Logs Console handlers
+  const diagnosticsOutput = document.getElementById('diagnostics-log-output');
+  const diagnosticsDetails = document.querySelector('.diagnostics-details');
+  const refreshLogsBtn = document.getElementById('refresh-logs-btn');
+  const clearLogsBtn = document.getElementById('clear-logs-btn');
+
+  const loadDiagnosticsLogs = () => {
+    if (diagnosticsOutput) {
+      const logs = ipcRenderer.sendSync('get-diagnostic-logs');
+      diagnosticsOutput.textContent = logs;
+      diagnosticsOutput.scrollTop = diagnosticsOutput.scrollHeight;
+    }
+  };
+
+  if (diagnosticsDetails) {
+    diagnosticsDetails.addEventListener('toggle', () => {
+      if (diagnosticsDetails.open) {
+        loadDiagnosticsLogs();
+      }
+    });
+  }
+
+  if (refreshLogsBtn) {
+    refreshLogsBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      loadDiagnosticsLogs();
+    });
+  }
+
+  if (clearLogsBtn) {
+    clearLogsBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      const cleared = ipcRenderer.sendSync('clear-diagnostic-logs');
+      if (cleared) {
+        loadDiagnosticsLogs();
+      }
+    });
+  }
 }
 
 const idleThoughts = [

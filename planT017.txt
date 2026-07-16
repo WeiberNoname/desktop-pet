@@ -87,18 +87,20 @@ cleanly reset the hover state.
     OS lag conditions might get dropped if the cursor leaves extremely fast.
 
 --------------------------------------------------------------------------------
-ALTERNATIVE 2: EDGE-PROXIMITY DETECTION GATES
+ALTERNATIVE 2: EDGE-PROXIMITY DETECTION GATES (SELECTED & IMPLEMENTED)
 --------------------------------------------------------------------------------
 
 Manually track the cursor coordinates inside the `mousemove` handler. If the cursor is 
-within a 2-pixel threshold of the window borders (left, right, top, or bottom), assume 
-an exit is imminent and proactively reset the hover state.
+within a 10-pixel threshold of the window borders (left, right, top, or bottom), assume 
+an exit is imminent, immediately clear the hover state, and restore focus capability 
+before the cursor exits the window boundaries. This ensures that the page captures 
+the transition out of the viewport cleanly, even if the model is scaled up to window edges.
 
 * Implementation Details:
   1. Modify the `mousemove` event listener in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js):
      ```javascript
      window.addEventListener('mousemove', (event) => {
-       const boundaryThreshold = 2; // pixels
+       const boundaryThreshold = 10; // pixels
        const isNearEdge = 
          event.clientX <= boundaryThreshold || 
          event.clientX >= window.innerWidth - boundaryThreshold ||
@@ -106,8 +108,11 @@ an exit is imminent and proactively reset the hover state.
          event.clientY >= window.innerHeight - boundaryThreshold;
 
        if (isNearEdge) {
-         isMouseOverCharacter = false;
-         updateIgnoreMouseState();
+         if (isMouseOverCharacter) {
+           isMouseOverCharacter = false;
+           document.body.style.cursor = 'default';
+           updateIgnoreMouseState();
+         }
          return;
        }
        
@@ -117,19 +122,22 @@ an exit is imminent and proactively reset the hover state.
 
 * Pros:
   - Executed entirely within the existing mouse coordinate tracking flow.
-  - Predicts window exits slightly before they happen, giving transitions a head start.
+  - Generates a guaranteed 10px padding zone where click-through is disabled, allowing 
+    Chromium to correctly detect and dispatch pointer exits.
+  - Highly robust: a 10px zone is wide enough that even high-speed cursor movements 
+    will trigger a `mousemove` event within the gate before crossing the screen border.
 * Cons:
-  - High-speed cursor movements can skip the boundary threshold completely, failing 
-    to trigger the guard.
-  - Restricts hover detection in the outermost pixels of the window.
+  - Slightly restricts hover detection in the outermost 10 pixels of the window boundaries.
 
 --------------------------------------------------------------------------------
-ALTERNATIVE 3: MAIN PROCESS COORDINATE MONITORING (POLLING HEARTBEAT)
+ALTERNATIVE 3: MAIN PROCESS COORDINATE MONITORING (SELECTED & IMPLEMENTED AS ADDITIONAL BARRIER)
 --------------------------------------------------------------------------------
 
 Implement a main process check in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js) 
 to periodically query the screen's absolute cursor position and compare it to the window 
-bounds whenever the app is set to ignore mouse events.
+bounds whenever the app is set to ignore mouse events. This guarantees that if the mouse 
+leaves the app bounds, click-through is immediately disabled and the mascot is restored, 
+bypassing any Chromium event drop limitations.
 
 * Implementation Details:
   1. In `main.js`, start a timer when `set-ignore-mouse` is set to `true`:
@@ -172,8 +180,11 @@ bounds whenever the app is set to ignore mouse events.
   2. In `renderer.js`, listen for `'force-hover-exit'`:
      ```javascript
      ipcRenderer.on('force-hover-exit', () => {
-       isMouseOverCharacter = false;
-       updateIgnoreMouseState();
+       if (isMouseOverCharacter) {
+         isMouseOverCharacter = false;
+         document.body.style.cursor = 'default';
+         updateIgnoreMouseState();
+       }
      });
      ```
 
