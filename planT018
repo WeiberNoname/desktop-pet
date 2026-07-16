@@ -1,0 +1,97 @@
+================================================================================
+PLAN T018: ROBUSTNESS IMPROVEMENT CONCEPTS FOR DESKTOP PET ARCHITECTURE
+================================================================================
+
+This document outlines four core architectural improvements aimed at making the 3D 
+Desktop Pet application more resilient, failure-proof, and robust against common 
+desktop environment edge cases.
+
+--------------------------------------------------------------------------------
+1. ROBUSTNESS IMPROVEMENT 1: ATOMIC CONFIGURATION WRITING & STATE RECOVERY
+--------------------------------------------------------------------------------
+
+* Current Problem:
+  Settings are loaded from and saved to configuration files dynamically. If the app 
+  is terminated abruptly (e.g., system shutdown, task manager force-kill) during a 
+  save operation, the configuration file can become corrupted or empty. On subsequent 
+  restarts, JSON/key-value parsing will fail, leading to startup crashes.
+
+* Robust Solution:
+  1. Atomic File Writing:
+     Instead of writing directly to the target config file, write the new settings to 
+     a temporary file (e.g., `settings.tmp`) first. Once the write succeeds, perform 
+     a synchronous rename/replace operation (`fs.renameSync`) to overwrite the active 
+     configuration.
+  2. Memory-Safe Default Fallback:
+     Implement a robust validation scheme. If the configuration file is missing, empty, 
+     or fails to parse, catch the exception, load a hardcoded default configuration 
+     object in memory, and recreate the configuration file automatically.
+
+* Code References:
+  - Config reading/writing logic in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1145) 
+    and [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js).
+
+--------------------------------------------------------------------------------
+2. ROBUSTNESS IMPROVEMENT 2: OFF-SCREEN BOUNDARY PROTECTION & DOCKING SNAP
+--------------------------------------------------------------------------------
+
+* Current Problem:
+  When dragging the pet via IPC (`move-window` event), fast mouse sweeps, frame drops, 
+  or monitor configuration changes (e.g., unplugging a second monitor) can place the 
+  window entirely off-screen. Once off-screen, the pet is unrecoverable, forcing the 
+  user to delete settings files or restart the app.
+
+* Robust Solution:
+  1. Screen Boundary Clipping:
+     In the `move-window` handler in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L174), 
+     retrieve the current display bounds via Electron's `screen.getDisplayMatching(rect)`.
+     Check if the target position puts the window coordinates outside the display's 
+     bounds. Clamp the position so that a minimum visible anchor region (e.g., at least 
+     50x50 pixels of the pet window) is guaranteed to stay within the display area.
+  2. Smart Docking Snap:
+     Enable an optional snap threshold (e.g., 15 pixels). When dragging the mascot close 
+     to screen margins or the system taskbar, automatically snap the window coordinates 
+     flush to the edge.
+
+--------------------------------------------------------------------------------
+3. ROBUSTNESS IMPROVEMENT 3: STEAMWORKS API MOCK INTERFACE FOR OFFLINE RESILIENCE
+--------------------------------------------------------------------------------
+
+* Current Problem:
+  If the Steam client is closed or offline, `steamClient.init(480)` fails. While this is 
+  caught safely via try/catch blocks, later attempts in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js) 
+  to dispatch achievements or check user statuses can result in null pointer exceptions 
+  if not manually checked.
+
+* Robust Solution:
+  1. Complete Mock Layer:
+     When the Steamworks API fail to initialize, instantiate a dummy mock interface that 
+     implements the exact same method signatures as `steamClient` (e.g., `storeStats()`, 
+     `setAchievement()`).
+  2. Offline Toasts fallback:
+     If the mock layer detects an achievement is unlocked while offline, redirect the IPC 
+     call to trigger local in-app custom notification toasts, showing the unlock visual 
+     locally instead of failing silently.
+
+* Code References:
+  - Steamworks initialization in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L7-L38).
+  - Achievement IPC invocations in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js).
+
+--------------------------------------------------------------------------------
+4. ROBUSTNESS IMPROVEMENT 4: DEBOUNCED MULTI-SCREEN RESIZING COHERENCE
+--------------------------------------------------------------------------------
+
+* Current Problem:
+  Resizing the transparent window dynamically based on 3D asset dimensions uses the 
+  `resize-window` IPC, shifting bounds coordinates so the bottom-right corner anchors. 
+  On high-DPI scaling monitors or multi-monitor setups with different scale factors, 
+  successive coordinate adjustments cause window drift, jitters, or visual size flickering.
+
+* Robust Solution:
+  1. Debounced Resize:
+     Debounce window resizing events in the renderer to prevent layout recalculations 
+     and coordinate updates during fast settings changes or asset switches.
+  2. DPI-Aware Bounds Calculation:
+     Query `screen.getPrimaryDisplay().scaleFactor` in the main process before applying 
+     resizing bounds. Convert logical coordinates to physical device pixels to prevent 
+     rounding errors in `mainWindow.setBounds` that trigger window shifting.

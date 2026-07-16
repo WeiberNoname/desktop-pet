@@ -1,0 +1,185 @@
+================================================================================
+PLAN T017: VIEW-ONLY MODE HOVER AND DISAPPEARANCE BUG ANALYSIS
+================================================================================
+
+This document details the analysis and proposed solutions for bugs associated with 
+the "View Only Mode", specifically where moving the cursor in and out from the bottom 
+of the application causes the mascot model to disappear permanently even after the 
+mouse has left the application.
+
+--------------------------------------------------------------------------------
+1. THE BUG: PERMANENT MODEL TRANSPARENCY & HOVER LOCK
+--------------------------------------------------------------------------------
+
+* Symptom:
+  With View Only Mode active, entering the window from the bottom boundary (where 
+  the mascot stands) causes the pet to fade to 0.0 opacity. When the mouse leaves 
+  the application from the bottom, the mascot remains invisible and the window 
+  remains stuck in click-through mode.
+
+* Directional Asymmetry (Why Other Directions Work Fine):
+  - Top, Left, and Right Boundaries:
+    The mascot character is anchored to the bottom of the Electron window. When the 
+    mouse cursor enters the window from the top, left, or right, it enters in empty 
+    space where the mascot is not present. As a result, the window remains in its 
+    default interactive state (`isMouseOverCharacter = false`). 
+    Even if the cursor subsequently hovers over the mascot (triggering opacity 
+    fade-out and click-through) and then leaves via the top, left, or right edges, 
+    the cursor must first travel away from the mascot. This movement triggers a final 
+    `mousemove` event in the empty space, setting `isMouseOverCharacter` to `false` 
+    and restoring opacity/interactivity *before* the cursor exits the window boundaries.
+  - Bottom Boundary:
+    Because the mascot's model is situated flush against the bottom edge of the 
+    window, entering the window from the bottom immediately positions the cursor 
+    over the model, triggering the hover and transparency instantly. 
+    Conversely, when the cursor leaves the window through the bottom, it transitions 
+    directly from hovering over the model to the outside of the window. No final 
+    `mousemove` event is registered in an "empty" region of the window, leaving the 
+    hover state stuck as `true`.
+
+* Root Cause Analysis:
+  1. Raycasting & State Transition:
+     In [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js), 
+     the `mousemove` listener performs raycasting to determine if the cursor is 
+     over the character. When it hits, `isMouseOverCharacter` is set to `true`.
+  2. Click-Through Activation:
+     If View Only Mode is enabled (`currentSettings.viewOnly === true`), the 
+     application applies a fade transition (`container.style.opacity = '0.0'`) 
+     and calls `ipcRenderer.send('set-ignore-mouse', true)`.
+  3. The Boundary Event Trap:
+     Exiting the window through the bottom crosses the boundary while the cursor is 
+     still hovering over the mascot. Once the cursor leaves the window bounds, 
+     Chromium stops receiving and forwarding standard `mousemove` events to the page.
+  4. Stuck State:
+     Because no more `mousemove` events are received, the renderer never runs 
+     another raycast to determine that the mouse has left the mascot. 
+     `isMouseOverCharacter` remains stuck as `true` indefinitely, keeping the 
+     mascot invisible and the window in click-through mode.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: WINDOW-LEVEL MOUSE LEAVE LISTENER (RECOMMENDED)
+--------------------------------------------------------------------------------
+
+Register a listener for the native `mouseleave` event on the window or document object 
+in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js). 
+This event triggers immediately when the cursor exits the viewport, allowing us to 
+cleanly reset the hover state.
+
+* Implementation Details:
+  1. Add a `mouseleave` listener inside `setupInteraction()` in `renderer.js`:
+     ```javascript
+     window.addEventListener('mouseleave', () => {
+       if (isMouseOverCharacter) {
+         isMouseOverCharacter = false;
+         document.body.style.cursor = 'default';
+         updateIgnoreMouseState();
+       }
+     });
+     ```
+  2. Ensure that any transitions reset the container and speech bubble opacities back 
+     to `1.0` and send the updated click-through command.
+
+* Pros:
+  - Very simple and clean: implements natively supported web APIs.
+  - Minimal code footprint with zero CPU/GPU overhead when the app is idle.
+* Cons:
+  - Relies on Chromium's native pointer leave dispatch, which under rare heavy 
+    OS lag conditions might get dropped if the cursor leaves extremely fast.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: EDGE-PROXIMITY DETECTION GATES
+--------------------------------------------------------------------------------
+
+Manually track the cursor coordinates inside the `mousemove` handler. If the cursor is 
+within a 2-pixel threshold of the window borders (left, right, top, or bottom), assume 
+an exit is imminent and proactively reset the hover state.
+
+* Implementation Details:
+  1. Modify the `mousemove` event listener in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js):
+     ```javascript
+     window.addEventListener('mousemove', (event) => {
+       const boundaryThreshold = 2; // pixels
+       const isNearEdge = 
+         event.clientX <= boundaryThreshold || 
+         event.clientX >= window.innerWidth - boundaryThreshold ||
+         event.clientY <= boundaryThreshold || 
+         event.clientY >= window.innerHeight - boundaryThreshold;
+
+       if (isNearEdge) {
+         isMouseOverCharacter = false;
+         updateIgnoreMouseState();
+         return;
+       }
+       
+       // ... existing raycast logic ...
+     });
+     ```
+
+* Pros:
+  - Executed entirely within the existing mouse coordinate tracking flow.
+  - Predicts window exits slightly before they happen, giving transitions a head start.
+* Cons:
+  - High-speed cursor movements can skip the boundary threshold completely, failing 
+    to trigger the guard.
+  - Restricts hover detection in the outermost pixels of the window.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: MAIN PROCESS COORDINATE MONITORING (POLLING HEARTBEAT)
+--------------------------------------------------------------------------------
+
+Implement a main process check in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js) 
+to periodically query the screen's absolute cursor position and compare it to the window 
+bounds whenever the app is set to ignore mouse events.
+
+* Implementation Details:
+  1. In `main.js`, start a timer when `set-ignore-mouse` is set to `true`:
+     ```javascript
+     let edgeCheckInterval = null;
+
+     ipcMain.on('set-ignore-mouse', (event, ignore) => {
+       if (isSteamOverlayActive) return;
+       if (mainWindow) {
+         mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
+         
+         if (ignore) {
+           if (!edgeCheckInterval) {
+             edgeCheckInterval = setInterval(() => {
+               if (!mainWindow) return;
+               const { x, y } = screen.getCursorScreenPoint();
+               const bounds = mainWindow.getBounds();
+               
+               // Check if cursor is outside window bounds
+               const isOutside = x < bounds.x || x > bounds.x + bounds.width ||
+                                 y < bounds.y || y > bounds.y + bounds.height;
+               
+               if (isOutside) {
+                 mainWindow.setIgnoreMouseEvents(false);
+                 mainWindow.webContents.send('force-hover-exit');
+                 clearInterval(edgeCheckInterval);
+                 edgeCheckInterval = null;
+               }
+             }, 100);
+           }
+         } else {
+           if (edgeCheckInterval) {
+             clearInterval(edgeCheckInterval);
+             edgeCheckInterval = null;
+           }
+         }
+       }
+     });
+     ```
+  2. In `renderer.js`, listen for `'force-hover-exit'`:
+     ```javascript
+     ipcRenderer.on('force-hover-exit', () => {
+       isMouseOverCharacter = false;
+       updateIgnoreMouseState();
+     });
+     ```
+
+* Pros:
+  - 100% reliable: queries system pointer position directly, bypasses all browser 
+    event limitations and window click-through event forwarding drops.
+* Cons:
+  - Introduces a active polling timer (every 100ms) in the main process, running 
+    counter to the desired low-power idle configuration.

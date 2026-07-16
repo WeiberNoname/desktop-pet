@@ -2,13 +2,44 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+class MockSteamClient {
+  constructor() {
+    this.isInitialized = true;
+    this.isMock = true;
+    this.friends = {
+      getPersonaName: () => "Guest Pet Owner 🐰"
+    };
+    this.userStats = {
+      unlockedAchievements: new Set(),
+      getAchievement: (name) => {
+        return this.userStats.unlockedAchievements.has(name);
+      },
+      setAchievement: (name) => {
+        this.userStats.unlockedAchievements.add(name);
+        return true;
+      },
+      storeStats: () => {
+        console.log(`[Mock Steam] Stats stored.`);
+        return true;
+      }
+    };
+  }
+  on(event, callback) {
+    console.log(`[Mock Steam] Event listener registered for ${event}`);
+  }
+  shutdown() {
+    console.log(`[Mock Steam] Shutdown mock client.`);
+  }
+}
+
 let isSteamOverlayActive = false;
 let steamClient = null;
 try {
   const { SteamClient } = require('@skyatnpm/steamworks-js');
-  steamClient = new SteamClient();
-  steamClient.init(480).then((success) => {
+  const realClient = new SteamClient();
+  realClient.init(480).then((success) => {
     if (success) {
+      steamClient = realClient;
       console.log("Steamworks API initialized. Active user:", steamClient.friends.getPersonaName());
       
       // Register gameOverlayActivated event listener
@@ -28,13 +59,16 @@ try {
         }
       });
     } else {
-      console.log("Steamworks API failed to initialize (Init returned false).");
+      console.log("Steamworks API failed to initialize (Init returned false). Instantiating Mock Interface.");
+      steamClient = new MockSteamClient();
     }
   }).catch((err) => {
     console.warn("Steamworks API failed to initialize (Offline Mode):", err.message);
+    steamClient = new MockSteamClient();
   });
 } catch (err) {
-  console.warn("Steamworks API failed to load module:", err.message);
+  console.warn("Steamworks API failed to load module. Instantiating Mock Interface:", err.message);
+  steamClient = new MockSteamClient();
 }
 
 let mainWindow;
@@ -201,14 +235,24 @@ ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
   if (steamClient && steamClient.isInitialized) {
     try {
       const isActivated = steamClient.userStats.getAchievement(achievementName);
+      const isMock = !!steamClient.isMock;
       if (!isActivated) {
         steamClient.userStats.setAchievement(achievementName);
         steamClient.userStats.storeStats();
         console.log(`[Steam] Achievement activated: ${achievementName}`);
-        event.reply('steam-achievement-unlocked', { success: true, name: achievementName, isSteamOnline: true });
+        event.reply('steam-achievement-unlocked', { 
+          success: !isMock, 
+          name: achievementName, 
+          isSteamOnline: !isMock 
+        });
       } else {
         console.log(`[Steam] Achievement already unlocked: ${achievementName}`);
-        event.reply('steam-achievement-unlocked', { success: false, alreadyUnlocked: true, name: achievementName, isSteamOnline: true });
+        event.reply('steam-achievement-unlocked', { 
+          success: false, 
+          alreadyUnlocked: true, 
+          name: achievementName, 
+          isSteamOnline: !isMock 
+        });
       }
     } catch (err) {
       console.error(`[Steam] Error activating achievement:`, err);
