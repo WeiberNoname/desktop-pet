@@ -1,0 +1,73 @@
+================================================================================
+PLAN T020: DEBUGGABILITY BARRIERS & DIAGNOSTIC SOLUTIONS
+================================================================================
+
+This document identifies the top 3 biggest issues that make the desktop pet 
+mascot application difficult to debug and profiles robust technical solutions for each.
+
+--------------------------------------------------------------------------------
+1. SILENT MAIN-PROCESS STEAMWORKS INITIALIZATION & NATIVE MODULE FAILURES (SELECTED & IMPLEMENTED)
+--------------------------------------------------------------------------------
+
+* The Barrier:
+  The Electron main process (`main.js`) handles native Steamworks API binding. If 
+  loading fails due to mismatched DLLs, missing prebuild binaries, or Steam being 
+  offline, these exceptions are swallowed or printed only to system terminal stdout. 
+  Because they occur in the main process, they are invisible in the renderer's 
+  Chromium DevTools console. Developers see "achievements not unlocking" without 
+  any visual error stack.
+
+* Proposed Solution: Unified Diagnostic Logging & IPC Trace Stream
+  - Implement a central diagnostic logger in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js) 
+    that writes both initialization success/failure messages and exception stacks 
+    to a persistent `diagnostics.log` file in the user's `assets/` folder.
+  - Expose a `get-diagnostic-logs` IPC listener so the renderer can fetch these 
+    system logs.
+  - Render a collapsible "Diagnostics Console" inside the Settings Panel in 
+    [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js) 
+    showing real-time status of Steamworks connection, loaded modules, and file writes.
+
+--------------------------------------------------------------------------------
+2. TRANSPARENT CLICK-THROUGH HOVER LOCK-OUTS (SELECTED & IMPLEMENTED)
+--------------------------------------------------------------------------------
+
+* The Barrier:
+  When click-through ignore-mouse events (`setIgnoreMouseEvents(true, { forward: true })`) 
+  are active, clicks are forwarded straight to background OS windows. If a bug 
+  locks the window in hover click-through state, the developer cannot right-click to 
+  inspect, click the settings cog, or focus the window to trigger DevTools keyboard 
+  shortcuts. Devs are locked out of their own application interface and must force-kill 
+  the process.
+
+* Proposed Solution: Developer Mode CLI Flag & Visual Boundary Grid
+  - Introduce a `--dev` or `--no-click-through` command line switch checked on startup 
+    in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js):
+    ```javascript
+    const isDevMode = process.argv.includes('--dev');
+    ```
+  - If in developer mode, permanently disable click-through behavior (bypass 
+    `setIgnoreMouseEvents`) and pass an indicator to the renderer.
+  - In [style.css](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/style.css), 
+    add a developer layout class that renders a subtle semi-transparent border 
+    and grid around the canvas when developer mode is active so that the physical 
+    window bounds are clearly visible.
+
+--------------------------------------------------------------------------------
+3. SILENT CONFIGURATION RESET EVENTS (SELECTED & IMPLEMENTED)
+--------------------------------------------------------------------------------
+
+* The Barrier:
+  The application implements a robust self-healing fallback loop when parsing corrupted 
+  or empty configuration files. If reading fails, it resets configuration variables to 
+  factory defaults in memory and overwrites the config file. While this prevents crashes, 
+  it does so silently. Developers cannot easily tell if the app successfully loaded their 
+  saved custom window parameters or silently reset due to a parser failure, causing 
+  mysterious "lost settings" bugs.
+
+* Proposed Solution: Diagnostic Recovery Flags & In-App Toast Alerts
+  - Modify the recovery path in `readSettingsFile()` inside [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js): 
+    when recovery defaults are applied, set an active recovery flag (`wasConfigHealed = true`).
+  - Upon initialization completion, check `wasConfigHealed`. If true, trigger a visible, 
+    persistent diagnostic notification toast (`⚠️ Configuration Corrupted: Reset to Default Values`) 
+    so the developer is immediately aware that config recovery occurred.
+  - Write a corresponding `[Config Recovery]` entry into the `diagnostics.log` file.

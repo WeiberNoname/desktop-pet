@@ -1,0 +1,120 @@
+================================================================================
+PLAN T019: ALTERNATIVE RESOLUTIONS FOR ENLARGED MODEL HOVER-LOCK BUG
+================================================================================
+
+This document details three alternative architectures to fix the bug where an 
+enlarged 3D mascot model projects beyond the window boundaries, causing raycasting 
+to detect hovers and maintain transparency even when the mouse has left the app.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 1: RAYCAST NDC VIEWPORT CLIPPING (COORDINATE SYSTEM CONSTRAINT)
+--------------------------------------------------------------------------------
+
+Instead of checking raw pixel coordinates (`clientX`/`clientY`), check if the calculated 
+Normalized Device Coordinates (NDC) used by Three.js fall outside the valid screen viewport 
+boundaries of `[-1, 1]`. If the pointer exceeds these bounds, skip the raycast entirely.
+
+* Implementation Details:
+  1. Modify the `mousemove` event handler in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js):
+     ```javascript
+     // Convert mouse coordinates to Normalized Device Coordinates (-1 to +1)
+     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+     // Clip raycasting if coordinates exceed valid projection bounds
+     const isOutsideViewport = Math.abs(mouse.x) > 1.0 || Math.abs(mouse.y) > 1.0;
+     if (isOutsideViewport) {
+       isMouseOverCharacter = false;
+       document.body.style.cursor = 'default';
+       updateIgnoreMouseState();
+       return;
+     }
+     
+     raycaster.setFromCamera(mouse, camera);
+     ```
+
+* Pros:
+  - Clean mathematical approach: directly integrates into the 3D ray projection logic.
+  - Zero performance impact: avoids executing expensive 3D bounding box raycasting 
+    calculations when the cursor is out of bounds.
+* Cons:
+  - Still relies on the renderer process receiving mouse events outside the window.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 2: SUB-VIEWPORT CANVAS MARGINS & DOM HOVER TRIGGERS (SELECTED & IMPLEMENTED)
+--------------------------------------------------------------------------------
+
+Constrain the Three.js WebGL canvas size to be slightly smaller than the Electron window 
+size by applying a 10px margin/padding around the canvas container in CSS, and only 
+allowing raycasting when hovering directly over the canvas element.
+
+* Implementation Details:
+  1. Add padding rules in [style.css](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/style.css):
+     ```css
+     #container {
+       padding: 10px;
+       box-sizing: border-box;
+     }
+     canvas {
+       pointer-events: auto;
+     }
+     ```
+  2. In `setupInteraction()` in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js), 
+     add a listener to the canvas element itself (instead of `window`) or check the event target:
+     ```javascript
+     window.addEventListener('mousemove', (event) => {
+       // If event target is not the canvas element, treat it as a hover exit
+       if (event.target.tagName !== 'CANVAS') {
+         isMouseOverCharacter = false;
+         updateIgnoreMouseState();
+         return;
+       }
+       // ... standard raycast ...
+     });
+     ```
+
+* Pros:
+  - Highly visual and structural: ensures the 3D viewport canvas itself never physically 
+    touches the window borders, leaving a natural "safety gap".
+  - Clean separation: separates UI hover zones from the WebGL rendering canvas.
+* Cons:
+  - Requires changes to both CSS and JS layout logic.
+  - Slightly shrinks the visual rendering area of the mascot within the window.
+
+--------------------------------------------------------------------------------
+ALTERNATIVE 3: ACTIVE SCREEN COORDINATE MOCK-STATE GATEWAY (MAIN PROCESS PRIORITY)
+--------------------------------------------------------------------------------
+
+Promote the main process boundary polling mechanism to be the primary coordinator of the 
+ignore-mouse state, completely bypassing the renderer's `mousemove` event loop when 
+determining window exits.
+
+* Implementation Details:
+  1. In [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js), 
+     when settings save or the window initializes, launch a lightweight coordinate 
+     heartbeat interval:
+     ```javascript
+     setInterval(() => {
+       if (!mainWindow || mainWindow.isDestroyed()) return;
+       const { x, y } = screen.getCursorScreenPoint();
+       const bounds = mainWindow.getBounds();
+       
+       const isInside = x >= bounds.x && x <= bounds.x + bounds.width &&
+                        y >= bounds.y && y <= bounds.y + bounds.height;
+                        
+       // If cursor exits the window bounds, force normal focus state in main process
+       if (!isInside) {
+         mainWindow.setIgnoreMouseEvents(false);
+         mainWindow.webContents.send('force-hover-exit');
+       }
+     }, 100);
+     ```
+  2. The renderer only handles raycasting to enter click-through mode, while the main 
+     process assumes sole responsibility for exiting click-through mode.
+
+* Pros:
+  - Extremely robust: 100% immune to Chromium event dispatch lag, renderer crashes, 
+    or click-through event drops.
+* Cons:
+  - Constant polling (every 100ms) inside the main process consumes minor CPU resources 
+    even when the system is completely idle.

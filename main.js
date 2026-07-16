@@ -2,6 +2,50 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Helper to determine path to assets folder
+function getAssetsPath() {
+  if (app.isPackaged) {
+    return path.join(path.dirname(process.execPath), 'assets');
+  }
+  return path.join(app.getAppPath(), 'assets');
+}
+
+// Global logger for writing traces to assets/diagnostics.log
+function logDiagnostic(message) {
+  const timestamp = new Date().toISOString();
+  const logLine = `[${timestamp}] ${message}\n`;
+  console.log(`[Diagnostic] ${message}`);
+  try {
+    const assetsDir = getAssetsPath();
+    if (!fs.existsSync(assetsDir)) {
+      fs.mkdirSync(assetsDir, { recursive: true });
+    }
+    const diagnosticsLogPath = path.join(assetsDir, 'diagnostics.log');
+    
+    // Check file size and truncate if larger than 100KB to keep it constrained
+    if (fs.existsSync(diagnosticsLogPath)) {
+      const stats = fs.statSync(diagnosticsLogPath);
+      if (stats.size > 100 * 1024) {
+        const data = fs.readFileSync(diagnosticsLogPath, 'utf8');
+        const lines = data.split('\n');
+        const truncatedData = lines.slice(-100).join('\n') + '\n';
+        fs.writeFileSync(diagnosticsLogPath, truncatedData, 'utf8');
+      }
+    }
+    
+    fs.appendFileSync(diagnosticsLogPath, logLine);
+  } catch (e) {
+    console.error("Failed to write to diagnostics.log:", e);
+  }
+}
+
+// Log application start
+logDiagnostic('=== Application Session Started ===');
+
+const isDevMode = process.argv.includes('--dev');
+logDiagnostic(`Developer Mode active: ${isDevMode}`);
+
+
 class MockSteamClient {
   constructor() {
     this.isInitialized = true;
@@ -34,17 +78,20 @@ class MockSteamClient {
 
 let isSteamOverlayActive = false;
 let steamClient = null;
+let edgeCheckInterval = null;
+logDiagnostic('Loading Steamworks module @skyatnpm/steamworks-js...');
 try {
   const { SteamClient } = require('@skyatnpm/steamworks-js');
+  logDiagnostic('Steamworks module loaded successfully. Initializing against App ID 480...');
   const realClient = new SteamClient();
   realClient.init(480).then((success) => {
     if (success) {
       steamClient = realClient;
-      console.log("Steamworks API initialized. Active user:", steamClient.friends.getPersonaName());
+      logDiagnostic(`Steamworks API initialized successfully. Active user: ${steamClient.friends.getPersonaName()}`);
       
       // Register gameOverlayActivated event listener
       steamClient.on('gameOverlayActivated', (active) => {
-        console.log(`[Steam] Overlay activated: ${active}`);
+        logDiagnostic(`[Steam Event] Overlay activated state changed to: ${active}`);
         isSteamOverlayActive = active;
         if (mainWindow && !mainWindow.isDestroyed()) {
           if (active) {
@@ -59,15 +106,15 @@ try {
         }
       });
     } else {
-      console.log("Steamworks API failed to initialize (Init returned false). Instantiating Mock Interface.");
+      logDiagnostic('Steamworks API initialization failed: init(480) returned false. Falling back to Mock Client.');
       steamClient = new MockSteamClient();
     }
   }).catch((err) => {
-    console.warn("Steamworks API failed to initialize (Offline Mode):", err.message);
+    logDiagnostic(`Steamworks API initialization rejected: ${err.message || err}. Falling back to Mock Client.`);
     steamClient = new MockSteamClient();
   });
 } catch (err) {
-  console.warn("Steamworks API failed to load module. Instantiating Mock Interface:", err.message);
+  logDiagnostic(`Failed to load Steamworks native binary or module: ${err.message || err}. Falling back to Mock Client.`);
   steamClient = new MockSteamClient();
 }
 
@@ -98,9 +145,14 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
 
-  // Start with click-through enabled (ignoring clicks) for transparent parts.
+  // Start with click-through enabled (ignoring clicks) for transparent parts (unless in dev mode).
   // forward: true ensures mouse movements are still tracked inside the window.
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+  mainWindow.setIgnoreMouseEvents(!isDevMode, { forward: true });
+
+  if (isDevMode) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    logDiagnostic('Developer mode: Detached DevTools window opened.');
+  }
 
   // Repaint invalidator for Steam overlay rendering correctness
   mainWindow.steamworksRepaintInterval = setInterval(() => {
@@ -117,18 +169,12 @@ function createWindow() {
     if (mainWindow && mainWindow.steamworksRepaintInterval) {
       clearInterval(mainWindow.steamworksRepaintInterval);
     }
+    if (edgeCheckInterval) {
+      clearInterval(edgeCheckInterval);
+      edgeCheckInterval = null;
+    }
     mainWindow = null;
   });
-}
-
-
-
-// Helper to determine path to settings configuration file inside main process
-function getAssetsPath() {
-  if (app.isPackaged) {
-    return path.join(path.dirname(process.execPath), 'assets');
-  }
-  return path.join(app.getAppPath(), 'assets');
 }
 
 function shouldOptimizeGPU() {
@@ -195,7 +241,38 @@ app.on('activate', function () {
 ipcMain.on('set-ignore-mouse', (event, ignore) => {
   if (isSteamOverlayActive) return; // Prevent renderer from overriding active overlay focus
   if (mainWindow) {
-    mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    const finalIgnore = isDevMode ? false : ignore;
+    mainWindow.setIgnoreMouseEvents(finalIgnore, { forward: true });
+
+    // Active polling fallback: check if cursor is outside window boundaries when click-through is enabled
+    if (finalIgnore) {
+      if (!edgeCheckInterval) {
+        edgeCheckInterval = setInterval(() => {
+          if (!mainWindow || mainWindow.isDestroyed()) {
+            clearInterval(edgeCheckInterval);
+            edgeCheckInterval = null;
+            return;
+          }
+          const { x, y } = screen.getCursorScreenPoint();
+          const bounds = mainWindow.getBounds();
+
+          const isOutside = x < bounds.x || x > bounds.x + bounds.width ||
+                            y < bounds.y || y > bounds.y + bounds.height;
+
+          if (isOutside) {
+            mainWindow.setIgnoreMouseEvents(false);
+            mainWindow.webContents.send('force-hover-exit');
+            clearInterval(edgeCheckInterval);
+            edgeCheckInterval = null;
+          }
+        }, 100);
+      }
+    } else {
+      if (edgeCheckInterval) {
+        clearInterval(edgeCheckInterval);
+        edgeCheckInterval = null;
+      }
+    }
   }
 });
 
@@ -232,6 +309,7 @@ ipcMain.on('resize-window', (event, size) => {
 
 // IPC handler to activate Steam achievements
 ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
+  logDiagnostic(`Received request to trigger achievement: ${achievementName}`);
   if (steamClient && steamClient.isInitialized) {
     try {
       const isActivated = steamClient.userStats.getAchievement(achievementName);
@@ -239,14 +317,14 @@ ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
       if (!isActivated) {
         steamClient.userStats.setAchievement(achievementName);
         steamClient.userStats.storeStats();
-        console.log(`[Steam] Achievement activated: ${achievementName}`);
+        logDiagnostic(`[Steam] Achievement successfully activated: ${achievementName} (isMock: ${isMock})`);
         event.reply('steam-achievement-unlocked', { 
           success: !isMock, 
           name: achievementName, 
           isSteamOnline: !isMock 
         });
       } else {
-        console.log(`[Steam] Achievement already unlocked: ${achievementName}`);
+        logDiagnostic(`[Steam] Achievement already unlocked: ${achievementName}`);
         event.reply('steam-achievement-unlocked', { 
           success: false, 
           alreadyUnlocked: true, 
@@ -255,10 +333,48 @@ ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
         });
       }
     } catch (err) {
-      console.error(`[Steam] Error activating achievement:`, err);
+      logDiagnostic(`[Steam] Error activating achievement ${achievementName}: ${err.message || err}`);
       event.reply('steam-achievement-unlocked', { success: false, error: err.message, name: achievementName, isSteamOnline: false });
     }
   } else {
+    logDiagnostic(`[Steam] Failed to trigger achievement ${achievementName}: steamClient not initialized.`);
     event.reply('steam-achievement-unlocked', { success: false, name: achievementName, isSteamOnline: false });
   }
 });
+
+// IPC handler to return absolute diagnostic log contents
+ipcMain.on('get-diagnostic-logs', (event) => {
+  try {
+    const diagnosticsLogPath = path.join(getAssetsPath(), 'diagnostics.log');
+    if (fs.existsSync(diagnosticsLogPath)) {
+      event.returnValue = fs.readFileSync(diagnosticsLogPath, 'utf8');
+    } else {
+      event.returnValue = 'No diagnostic logs found.';
+    }
+  } catch (e) {
+    event.returnValue = `Error reading diagnostics log: ${e.message}`;
+  }
+});
+
+// IPC handler to clear diagnostics log
+ipcMain.on('clear-diagnostic-logs', (event) => {
+  try {
+    const diagnosticsLogPath = path.join(getAssetsPath(), 'diagnostics.log');
+    fs.writeFileSync(diagnosticsLogPath, `[${new Date().toISOString()}] Diagnostics cleared.\n`, 'utf8');
+    event.returnValue = true;
+  } catch (e) {
+    event.returnValue = false;
+  }
+});
+
+// IPC handler to query developer mode status
+ipcMain.on('is-dev-mode', (event) => {
+  event.returnValue = isDevMode;
+});
+
+// IPC handler for renderer diagnostics logging
+ipcMain.on('log-diagnostic', (event, message) => {
+  logDiagnostic(message);
+});
+
+
