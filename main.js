@@ -165,7 +165,19 @@ function createWindow() {
     }
   }, 1000 / 60);
 
+  // Background uptime monitor for ACH_TRAVEL_FAR (triggers every 20 minutes)
+  let uptimeAchievementInterval = setInterval(() => {
+    if (steamClient && steamClient.isInitialized && steamClient.userStats) {
+      logDiagnostic('[Uptime Monitor] Triggering 20-minute achievement: ACH_TRAVEL_FAR');
+      steamClient.userStats.setAchievement('ACH_TRAVEL_FAR');
+      steamClient.userStats.storeStats();
+    }
+  }, 1200 * 1000);
+
   mainWindow.on('closed', function () {
+    if (uptimeAchievementInterval) {
+      clearInterval(uptimeAchievementInterval);
+    }
     if (mainWindow && mainWindow.steamworksRepaintInterval) {
       clearInterval(mainWindow.steamworksRepaintInterval);
     }

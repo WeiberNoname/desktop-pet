@@ -1,4 +1,4 @@
-DESKTOP PET MASCOT - STANDALONE COMPILATION BUILD GUIDE
+DESKTOP PET MASCOT V3 - STANDALONE COMPILATION BUILD GUIDE
 
 This document provides a step-by-step guide on how to rebuild the source code
 into a standalone Windows executable (.exe) application.
@@ -9,7 +9,7 @@ into a standalone Windows executable (.exe) application.
 Before compiling, ensure you have the following installed on your computer:
 1. Node.js (version 18.0.0 or higher recommended)
    - Download from: https://nodejs.org
-   - This installs both the Node runtime and the NPM package manager.
+   - Installs Node runtime and NPM package manager.
 2. Windows Command Prompt, PowerShell, or your IDE's integrated terminal.
 
 ================================================================================
@@ -19,27 +19,27 @@ Before compiling, ensure you have the following installed on your computer:
 STEP 1: OPEN YOUR TERMINAL AND NAVIGATE TO THE PROJECT
 Open PowerShell or CMD and navigate to your project root folder:
 ```bash
-cd C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet
+cd "C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet V3"
 ```
 
 STEP 2: ENSURE DEPENDENCIES ARE INSTALLED
-Before compiling, all necessary libraries (Three.js, Electron framework, and
-Electron-Packager builder) must be present in your `node_modules` directory:
+Before compiling, all necessary libraries (Three.js, Electron framework, i18next, 
+steamworks-js, and Electron-Packager builder) must be present in `node_modules`:
 ```bash
 npm install
 ```
 *Note: If PowerShell blocks execution due to execution policy rules, run
-`npm.cmd install` instead of `npm install`.*
+`cmd /c npm install` or set execution policy (`Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process`).*
 
 STEP 3: RUN THE COMPILER BUILD COMMAND
 Run the automated packaging script configured in package.json:
 ```bash
 npm run build
 ```
-*Note: Run `npm.cmd run build` if PowerShell script policies are restrictive.*
+*Note: Run `cmd /c npm run build` if PowerShell script policies are restrictive.*
 
-Behind the scenes, this executes the following parameters:
-`electron-packager . DesktopPet --platform=win32 --arch=x64 --overwrite`
+Behind the scenes, this executes the following command sequence:
+`electron-packager . DesktopPet --platform=win32 --arch=x64 --overwrite && copy steam_appid.txt DesktopPet-win32-x64\`
 - `.`              : Tells the builder to package the current directory folder.
 - `DesktopPet`     : Sets the compiled binary's program name.
 - `--platform=win32`: Instructs the packaging engine to compile for Windows OS.
@@ -49,30 +49,31 @@ Behind the scenes, this executes the following parameters:
 ================================================================================
 📦 UNDERSTANDING THE BUILD OUTPUT
 ================================================================================
-Once compilation finishes successfully, you will see a new folder named:
+Once compilation finishes successfully, you will see the output directory:
 📁 `DesktopPet-win32-x64/`
 
 Inside this folder, you will find:
 1. 📄 `DesktopPet.exe`
    - The compiled desktop app. You can double-click this to run the mascot pet
-     directly. It is completely portable and requires no terminal or Node setup.
+     directly. It is completely portable and requires no terminal setup.
 2. 📁 `assets/`
-   - The folder where you drop your custom `.glb` / `.gltf` models and configure
-     your pet.
+   - The folder where you drop your custom `.glb` / `.gltf` models and configure your pet.
    - **`settings` File:** On startup, the application automatically scans and generates a default
-     `settings` file here if it is missing, making settings ready immediately.
-     It contains properties like widths, heights, scales, bobbing switches, axis spins
-     (spinX, spinY, spinZ), and bi-directional speed values (speedX, speedY, speedZ ranging
-     from -5.0 to 5.0).
-3. 📁 `resources/` and `locales/`
-   - Houses the compiled chromium web engine views and dependencies. Do not
-     move or delete these directories, as they are required by the executable.
+     `settings` file here if missing, storing configurations (language, width, height, scale, bobbing,
+     spinX/Y/Z, speeds, font scale, GPU & mouse optimization flags).
+   - **`.previews/` Folder:** Cache folder housing auto-generated 3D model thumbnail icons.
+3. 📄 `steam_appid.txt`
+   - Contains Steam App ID `480` for local Steamworks SDK initialization.
+4. 📁 `resources/` and `locales/`
+   - Houses the compiled Chromium web engine views, dependency frameworks, and internationalization dictionaries.
 
 ================================================================================
 💡 CUSTOMIZATION BEFORE REBUILDING
 ================================================================================
 If you want to edit how the app behaves before compiling the executable:
-- Window Size / Starting Position: Modify [main.js] (width/height dimensions).
-- Lighting / Default Procedural Shapes / Animations / Spins: Modify [renderer.js].
-- Transparency / Settings Styles: Governed inside [style.css].
+- Window Size / Window Anchor / Steamworks / Logging: Modify [main.js].
+- Multi-Language Translations / Locales: Modify files inside [locales/].
+- i18n Engine logic: Modify [i18nManager.js].
+- Viewport Controls / 3D Rendering / Previews / Interactions: Modify [renderer.js].
+- Visual Layout & Fonts: Governed inside [style.css] and [index.html].
 - Re-run `npm run build` after making edits to update the compiled program.

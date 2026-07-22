@@ -1,0 +1,105 @@
+================================================================================
+PLAN S1: CONSOLIDATED SPECIFICATION OF ACTIVE DESKTOP PET SYSTEMS
+================================================================================
+
+This document consolidates all implemented features and technical systems from 
+Plan T001 through Plan T023 that are currently active in the Desktop Pet V3 
+application. It documents only live, working code systems and omits all rationale, 
+benefits, and conceptual proposals.
+
+--------------------------------------------------------------------------------
+1. 3D GRAPHICS RENDERER & ASSET LOADING ENGINE
+--------------------------------------------------------------------------------
+- Three.js WebGL renderer loop with transparent background (RGBA 0,0,0,0) and PCFSoftShadowMap shadows.
+- Procedural mascot generator building a pink bunny (sphere body, ears, eyes, nose, cheeks).
+- GLTF/GLB loader (`GLTFLoader`) with automatic ground alignment and bounding box scaling.
+- Windows Explorer drag-and-drop file handler copying `.glb`/`.gltf` files directly into `assets/`.
+- Fallback mascot logic restoring procedural bunny if `assets/` contains no valid models.
+- Idle bobbing animation system (vertical sine-wave floating and rotation).
+- Continuous 3-axis rotation (X, Y, Z) with independent speed adjustments.
+
+--------------------------------------------------------------------------------
+2. ANIMATION MIXER & INTERACTION ENGINE
+--------------------------------------------------------------------------------
+- Animation clip track parser categorizing GLTF clips into idle ("idle", "stay", "breathe") and reaction ("jump", "spin", "click", "react").
+- Click interaction handler playing 360° spin and jump animation for procedural mascot or reaction clips for custom models.
+- Dynamic camera Z distance recalculation on save to fit resized models within viewport bounds.
+
+--------------------------------------------------------------------------------
+3. BLENDER-STYLE 3D VIEWPORT NAVIGATION CONTROLS
+--------------------------------------------------------------------------------
+- Orbit controls: Alt + Left-Drag or MMB-Drag rotates camera view.
+- Pan controls: Shift + Left-Drag or Shift + MMB-Drag translates camera position.
+- Zoom controls: Scroll wheel or Ctrl + Left-Drag adjusts camera depth (Z position).
+- Orthographic view shortcuts: Key 1 (Front), Key 3 (Right), Key 7 (Top).
+- View reset shortcuts: Key 9 (180° flip), Key . or F (Reset to origin).
+- Mascot reset shortcut: Alt + Double-Click on mascot resets 3D view orientation.
+
+--------------------------------------------------------------------------------
+4. MOUSE HOVER, CLICK-THROUGH & WINDOW BOUNDARY MANAGEMENT
+--------------------------------------------------------------------------------
+- Electron transparent window (`transparent: true`, `frame: false`, `alwaysOnTop: true`).
+- Dynamic click-through handling via `setIgnoreMouseEvents(ignore, { forward: true })`.
+- Raycasting hover detection capturing mouse input when over 3D mascot geometry or settings UI, and passing through when over transparent canvas areas.
+- Seamless Performance Mode (`mouseOptimize`) executing throttled proxy raycasting.
+- Canvas margin padding (10px) with DOM target validation (`event.target.tagName !== 'CANVAS'`) resetting hover on canvas exit.
+- Main process cursor boundary polling interval (`edgeCheckInterval`, 100ms) forcing click-through when cursor exits window bounds.
+- View-Only Mode (`viewOnly` checkbox or Ctrl + V toggle) fading window opacity to 0.0 on hover to pass clicks through.
+
+--------------------------------------------------------------------------------
+5. SETTINGS PANEL & CONFIGURATION PERSISTENCE
+--------------------------------------------------------------------------------
+- Glassmorphic Settings Panel overlay toggled via hover gear button (`⚙️`).
+- Settings sliders & controls:
+  - Language Selector dropdown (31 languages).
+  - Active Mascot selection grid with thumbnail previews.
+  - Active Animation clip selector.
+  - Window Width & Height sliders (30px to full monitor resolution).
+  - Model Scale slider (0.10x to 5.00x).
+  - Panel Text Size font scale slider (0.80x to 2.00x).
+  - Idle Bobbing toggle.
+  - View Only Mode toggle.
+  - Lock Mascot Position toggle.
+  - Force High-Performance GPU toggle.
+  - Seamless Performance Mode toggle.
+  - Gear Icon Left/Right position toggle (`settingsLeft`).
+  - Axis Spinning checkboxes and X, Y, Z speed sliders.
+- Atomic configuration persistence saving `key=value` pairs to `assets/settings` via temporary file staging.
+- Self-healing config parser restoring factory defaults if `assets/settings` is corrupted.
+
+--------------------------------------------------------------------------------
+6. ASSET PREVIEW GENERATOR
+--------------------------------------------------------------------------------
+- Asynchronous preview generator (`startBackgroundPreviewGenerator`) rendering offscreen thumbnails to `assets/.previews/`.
+- Mascot selection grid UI displaying thumbnail images and model names inside Settings Panel.
+- Manual refresh trigger ("Refresh Previews 🔄") clearing `.previews/` and regenerating thumbnails.
+
+--------------------------------------------------------------------------------
+7. HARDWARE EFFICIENCY & PROCESS ENVIRONMENT
+--------------------------------------------------------------------------------
+- High-performance GPU switches: `force-high-performance-gpu`, `ignore-gpu-blocklist`, `disable-backgrounding-occluded-windows`.
+- Developer Mode (`--dev` CLI flag) displaying detached Chromium DevTools, red dashed boundary border, and developer badge.
+
+--------------------------------------------------------------------------------
+8. MULTI-LANGUAGE (I18N) LOCALIZATION ENGINE (31 LANGUAGES)
+--------------------------------------------------------------------------------
+- i18next framework engine (`i18nManager.js`) with system locale auto-detection (`navigator.language`).
+- 31 complete locale resource files in `locales/<code >/translation.json`:
+  English (en), French (fr), Italian (it), German (de), Spanish - Spain (es), Arabic (ar), Bulgarian (bg), Czech (cs), Danish (da), Dutch (nl), Finnish (fi), Greek (el), Hungarian (hu), Indonesian (id), Japanese (ja), Korean (ko), Malay (ms), Norwegian (no), Polish (pl), Portuguese - Brazil (pt-BR), Portuguese - Portugal (pt-PT), Romanian (ro), Russian (ru), Simplified Chinese (zh-CN), Spanish - Latin America (es-419), Swedish (sv), Thai (th), Traditional Chinese (zh-TW), Turkish (tr), Ukrainian (uk), Vietnamese (vi).
+- Dynamic DOM translation updater binding `data-i18n` and `data-i18n-title` attributes.
+- Cross-platform CJK font stack fallbacks (`PingFang SC`, `Hiragino Sans`, `Meiryo`, `Malgun Gothic`, `Noto Sans CJK`).
+
+--------------------------------------------------------------------------------
+9. STEAMWORKS INTEGRATION & ACHIEVEMENTS
+--------------------------------------------------------------------------------
+- Native Steamworks bindings (`@skyatnpm/steamworks-js`, App ID 480) with `MockSteamClient` offline fallback.
+- Steam overlay activation listener (`gameOverlayActivated`) handling input focus and fullscreen overlay state.
+- Frame repaint invalidator (`steamworksRepaintInterval`, 60 FPS) maintaining overlay rendering.
+- Steam achievements: `ACH_HEAVY_RADAR` (saving settings) and `ACH_TRAVEL_FAR` (20-minute background uptime monitor interval in `main.js`).
+
+--------------------------------------------------------------------------------
+10. DIAGNOSTICS & SYSTEM LOGGING CONSOLE
+--------------------------------------------------------------------------------
+- Diagnostic logger (`logDiagnostic`) writing traces to `assets/diagnostics.log` with 100KB auto-truncation.
+- Collapsible "🔍 Diagnostics & Logs" console in Settings Panel with "Refresh Logs" and "Clear Logs" buttons.
+- Complete removal of mascot speech bubbles and idle dialogue popups (Approach C of Plan T023); system alerts are logged to the Diagnostics Console.

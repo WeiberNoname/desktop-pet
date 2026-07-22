@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@skyatnpm/steamworks-js": "^0.1.0",
+    "i18next": "^26.3.6",
     "three": "^0.166.0"
   },
   "devDependencies": {
