@@ -23,8 +23,8 @@ Perfect for instant use without running terminal commands.
 
 ---
 
-### Option B: Local Node.js Development
-Ideal if you want to inspect, debug, or extend the JavaScript source files.
+### Option B: Local Development & GitHub Reproduction
+Ideal if you download the source code from GitHub to inspect, debug, or extend the app.
 
 1. Ensure [Node.js](https://nodejs.org) is installed.
 2. Open terminal and navigate to the project directory:
@@ -35,14 +35,28 @@ Ideal if you want to inspect, debug, or extend the JavaScript source files.
    ```bash
    npm install
    ```
-4. Start the dev app:
+4. **Generate multi-language (i18n) dictionaries (Crucial Step):**
+   ```bash
+   node scratch_create_locales.js
+   ```
+   > [!IMPORTANT]
+   > Running `node scratch_create_locales.js` populates all 31 language folders inside [locales/](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/locales) (e.g., `locales/en/translation.json`). Running `npm install` alone is not enough; this step is required for language switching to work.
+
+5. Start the dev app:
    ```bash
    npm start
    ```
-5. Recompile the production executable after modifying code:
+6. Recompile the production executable after modifying code:
    ```bash
    npm run build
    ```
+
+### ⚠️ PowerShell Build Troubleshooting
+If running `npm run build` in PowerShell returns an execution policy restriction error:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+```
+Or build directly using standard Windows Command Prompt (`cmd`).
 
 ---
 
@@ -58,6 +72,10 @@ Desktop Pet V3 includes an enterprise-grade internationalization system built on
 
 * **Dynamic Locale Switching**: Changing the language instantly updates all panel headers, labels, view control guides, and diagnostics buttons without restarting.
 * **Global Typography Fallbacks**: Integrated CJK font stacks (`PingFang SC`, `Hiragino Sans`, `Meiryo`, `Malgun Gothic`, `Noto Sans CJK`) and RTL styling for seamless international text rendering.
+* **Editing & Adding Languages**: Edit JSON dictionary files directly in [locales/](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/locales) and register new locale codes in `SUPPORTED_LANGUAGES` inside [i18nManager.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/i18nManager.js).
+
+
+
 
 ---
 
@@ -134,9 +152,4 @@ Alternatively, you can manually manage models:
 
 ---
 
-### ⚠️ PowerShell Build Troubleshooting
-If running `npm run build` in PowerShell returns an execution policy restriction error:
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
-```
-Or build directly using standard Windows Command Prompt (`cmd`).
+
