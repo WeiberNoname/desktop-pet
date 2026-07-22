@@ -1,7 +1,7 @@
 <img width="400" height="236" alt="Recording 2026-07-04 002226" src="https://github.com/user-attachments/assets/ec017b5e-f488-409f-ae98-e225e1fadb53" />
 
 
-# 3D Transparent Desktop Mascot Pet 🐰 (V3)
+# 3D Transparent Desktop Mascot Pet 🐰 (V4)
 
 A floating, borderless, fully transparent (RGBA 0,0,0,0) 3D interactive companion pet application for Windows, powered by **Electron**, **Three.js (WebGL)**, and **i18next**.
 
@@ -11,11 +11,14 @@ The mascot floats on top of your working windows, bobbing gently. It captures cl
 
 ## 🚀 How to Run the App
 
+> [!IMPORTANT]
+> If the Steam app is not logged in yet, the Steam overlay will not appear on the screen (the app automatically operates using the offline fallback mode).
+
 ### Option A: Standalone Executable (No Setup Required)
 Perfect for instant use without running terminal commands.
 
 1. Open **File Explorer** and navigate to:
-   [DesktopPet-win32-x64](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/DesktopPet-win32-x64)
+   [DesktopPet-win32-x64](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/DesktopPet-win32-x64)
 2. Double-click **`DesktopPet.exe`** to start your pet mascot.
 
 > [!TIP]
@@ -29,7 +32,7 @@ Ideal if you download the source code from GitHub to inspect, debug, or extend t
 1. Ensure [Node.js](https://nodejs.org) is installed.
 2. Open terminal and navigate to the project directory:
    ```bash
-   cd "C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet V3"
+   cd "C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet v4"
    ```
 3. Install dependencies:
    ```bash
@@ -40,7 +43,7 @@ Ideal if you download the source code from GitHub to inspect, debug, or extend t
    node scratch_create_locales.js
    ```
    > [!IMPORTANT]
-   > Running `node scratch_create_locales.js` populates all 31 language folders inside [locales/](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/locales) (e.g., `locales/en/translation.json`). Running `npm install` alone is not enough; this step is required for language switching to work.
+   > Running `node scratch_create_locales.js` populates all 31 language folders inside [locales/](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/locales) (e.g., `locales/en/translation.json`). Running `npm install` alone is not enough; this step is required for language switching to work.
 
 5. Start the dev app:
    ```bash
@@ -62,7 +65,7 @@ Or build directly using standard Windows Command Prompt (`cmd`).
 
 ## 🌍 Multi-Language (i18n) Support (31 Languages)
 
-Desktop Pet V3 includes an enterprise-grade internationalization system built on the **i18next framework**. The application automatically detects your operating system locale or allows you to select any of the **31 supported languages** directly from the Settings Panel:
+Desktop Pet V4 includes an enterprise-grade internationalization system built on the **i18next framework**. The application automatically detects your operating system locale or allows you to select any of the **31 supported languages** directly from the Settings Panel:
 
 | Region / Scope | Supported Languages & Locales |
 | :--- | :--- |
@@ -72,7 +75,7 @@ Desktop Pet V3 includes an enterprise-grade internationalization system built on
 
 * **Dynamic Locale Switching**: Changing the language instantly updates all panel headers, labels, view control guides, and diagnostics buttons without restarting.
 * **Global Typography Fallbacks**: Integrated CJK font stacks (`PingFang SC`, `Hiragino Sans`, `Meiryo`, `Malgun Gothic`, `Noto Sans CJK`) and RTL styling for seamless international text rendering.
-* **Editing & Adding Languages**: Edit JSON dictionary files directly in [locales/](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/locales) and register new locale codes in `SUPPORTED_LANGUAGES` inside [i18nManager.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/i18nManager.js).
+* **Editing & Adding Languages**: Edit JSON dictionary files directly in [locales/](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/locales) and register new locale codes in `SUPPORTED_LANGUAGES` inside [i18nManager.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/i18nManager.js).
 
 
 
@@ -106,8 +109,8 @@ The app automatically detects, centers, and displays any 3D asset:
 
 Alternatively, you can manually manage models:
 1. Locate the **`assets/`** folder:
-   - Development path: [assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/assets)
-   - Executable path: [DesktopPet-win32-x64/assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/DesktopPet-win32-x64/assets)
+   - Development path: [assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/assets)
+   - Executable path: [DesktopPet-win32-x64/assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/DesktopPet-win32-x64/assets)
 2. Drop any **`.glb`** or **`.gltf`** model file into this directory.
 3. Reload or select it inside the Settings Panel.
 4. **Fallback:** If you empty the `assets/` folder, the application immediately falls back to rendering the default pink bunny mascot.
@@ -135,19 +138,19 @@ Alternatively, you can manually manage models:
 
 ---
 
-## ⚡ Performance & Clean Architecture Notes (V3 Refactoring)
+## ⚡ Performance & Clean Architecture Notes (V4 Refactoring)
 
-* **Dialogue System Purge (Approach C)**: Speech bubble popups and idle text timers were purged in V3 to maximize render loop performance (`60 FPS`) and keep runtime code lean.
+* **Dialogue System Purge (Approach C)**: Speech bubble popups and idle text timers were purged in V3/V4 to maximize render loop performance (`60 FPS`) and keep runtime code lean.
 * **Central Diagnostics Console**: System alerts and config recovery messages are now output directly to the collapsible Diagnostics Console (`assets/diagnostics.log`), keeping the visual canvas unobstructed.
-* **Decoupled Steam Achievements**: Uptime achievements (`ACH_TRAVEL_FAR`) operate via an independent background monitor in [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/main.js), completely decoupled from UI popups.
+* **Decoupled Steam Achievements**: Uptime achievements (`ACH_TRAVEL_FAR`) operate via an independent background monitor in [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/main.js), completely decoupled from UI popups.
 
 ---
 
 ## 🛡️ Robustness & Troubleshooting
 
-* **Sub-Viewport Canvas Margins**: 10px padding constraint on HTML container with DOM target validation (`event.target.tagName !== 'CANVAS'`) in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/renderer.js) to instantly reset hover states and clear click-through.
-* **Main Process Edge Check Polling**: 100ms interval query in [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/main.js) checking cursor positions and forcing hover exits when crossing boundaries.
-* **Atomic Settings Staging**: Atomic writes via temporary file staging and synchronous renaming in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/renderer.js) to prevent settings file corruption during unexpected shutdowns.
+* **Sub-Viewport Canvas Margins**: 10px padding constraint on HTML container with DOM target validation (`event.target.tagName !== 'CANVAS'`) in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/renderer.js) to instantly reset hover states and clear click-through.
+* **Main Process Edge Check Polling**: 100ms interval query in [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/main.js) checking cursor positions and forcing hover exits when crossing boundaries.
+* **Atomic Settings Staging**: Atomic writes via temporary file staging and synchronous renaming in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20v4/renderer.js) to prevent settings file corruption during unexpected shutdowns.
 * **Offline Steamworks Mock**: Built-in `MockSteamClient` fallback when Steam is offline, allowing in-app achievements to trigger smoothly.
 
 ---

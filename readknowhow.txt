@@ -1,4 +1,4 @@
-DESKTOP PET MASCOT V3 - SEQUENTIAL EXECUTION LOGIC FLOW
+DESKTOP PET MASCOT V4 - SEQUENTIAL EXECUTION LOGIC FLOW
 
 This document details the step-by-step sequential logic flow of the application
 from launch to user interaction, multi-language rendering, and diagnostics.

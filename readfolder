@@ -1,4 +1,4 @@
-DESKTOP PET MASCOT V3 - PROJECT DIRECTORY AND FILE STRUCTURE
+DESKTOP PET MASCOT V4 - PROJECT DIRECTORY AND FILE STRUCTURE
 
 This document explains the purpose and role of every folder and file in this project.
 
@@ -6,7 +6,7 @@ This document explains the purpose and role of every folder and file in this pro
 📁 DIRECTORY TREE
 ================================================================================
 
-desktop-pet V3/
+desktop-pet v4/
 │
 ├── assets/                       # Development assets folder for 3D model drops
 │   ├── .previews/                # Generated thumbnail previews for custom 3D models
@@ -68,7 +68,7 @@ desktop-pet V3/
 ├── readguide.txt                 # Standalone compilation build guide
 ├── readknowhow.txt               # Sequential execution logic flow manual
 ├── readsteam.txt                 # Steam launch & Steamworks integration guide
-├── planS1.txt                    # Consolidated technical specification of all active V3 systems
+├── planS1.txt                    # Consolidated technical specification of all active V4 systems
 └── steam_appid.txt               # Steam App ID definition file (480)
 
 ================================================================================
