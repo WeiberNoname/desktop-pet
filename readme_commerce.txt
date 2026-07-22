@@ -1,16 +1,16 @@
-COMMERCIAL APPLICATION AND SALES OUTLETS FOR 3D DESKTOP PETS
+COMMERCIAL APPLICATION AND SALES OUTLETS FOR 3D DESKTOP PETS V3
 
 This document outlines direct venues and methods where this interactive 3D desktop mascot application can be monetized and sold.
 
 1. B2C DIGITAL DISTRIBUTORS (DIRECT CONSUMER SALES)
-   - Steam Store: Sold under the "Utilities" or "Casual" software categories (highly successful category for wallpaper engines, desktop widgets, and companion mascots).
-   - itch.io: A popular marketplace for indie developers, custom digital assets, and niche companion software.
-   - Microsoft Store: Direct integration into the Windows app ecosystem for general consumers.
-   - Epic Games Store: Distribution as a casual utility/software application.
+   - Steam Store: Sold under "Utilities" or "Casual" software categories (highly successful category for desktop companions, wallpaper engines, and interactive widgets). Fully localized for 31 global regions.
+   - itch.io: Popular marketplace for indie software, custom digital assets, and desktop tools.
+   - Microsoft Store: Direct integration into the Windows app store for general consumers.
+   - Epic Games Store: Distribution as a casual desktop companion software application.
 
 2. IN-APP MICRO-TRANSACTIONS (ASSET CATALOG SALES)
-   - 3D Model Skins: Selling alternative character models (different animals, fantasy creatures, outfits) optimized for the zero-code drag-and-drop installer.
-   - Animation Packs: Selling additional motion sets (e.g., custom dances, reactions, idle states) embedded in custom GLB models.
+   - 3D Model Skins: Selling alternative character models (different animals, fantasy creatures, outfits) optimized for the zero-code drag-and-drop installer with thumbnail preview integration.
+   - Animation Packs: Selling additional motion sets (e.g., custom dances, reactions, idle loops) embedded in custom GLB models.
    - Theme Customizations: Selling customized settings profiles (window configurations, specific spin velocities, scaling) matching customized 3D character drops.
    - Accessory Drops: Selling hats, wings, or accessories modeled directly onto character meshes.
 
@@ -20,5 +20,6 @@ This document outlines direct venues and methods where this interactive 3D deskt
    - Brand Sponsorships: Displaying sponsored branded accessories or items held by the mascot (e.g., a mascot drinking from a specific energy drink can).
 
 4. ENTERPRISE AND B2B WELLNESS UTILITY SALES
+   - Global Enterprise Localization: Full localization support across 31 international languages allows seamless deployment across multi-national workforce environments.
    - Corporate Branding: Selling custom corporate mascots to companies for remote team integration.
-   - Workplace Wellness Companion: Licensing the software to companies as a wellness utility that floats on employees' desktops to deliver hydration reminders, posture check alerts, and quick guided stretch animations.
+   - Workplace Desktop Companion: Licensing the software to companies as a unobtrusive desktop companion that operates silently in the background while logging diagnostic events to the non-intrusive Diagnostics Console.

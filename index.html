@@ -8,7 +8,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "./node_modules/three/build/three.module.js"
+      "three": "./node_modules/three/build/three.module.js",
+      "i18next": "./node_modules/i18next/dist/esm/i18next.js"
     }
   }
   </script>
@@ -16,103 +17,134 @@
 <body>
   <div id="container"></div>
 
-  <!-- Floating Speech Bubble -->
-  <div id="speech-bubble" class="speech-bubble hidden">
-    <div id="bubble-text" class="bubble-text">Hi there!</div>
-    <div class="bubble-arrow"></div>
-  </div>
-
   <!-- Settings Cog Button -->
-  <button id="settings-btn" class="settings-btn" title="Open Settings" style="display: none;">⚙️</button>
+  <button id="settings-btn" class="settings-btn" title="Open Settings" data-i18n-title="open_settings" style="display: none;">⚙️</button>
 
   <!-- Settings Panel Overlay -->
   <div id="settings-panel" class="settings-panel hidden">
-    <h3>⚙️ Mascot Settings</h3>
+    <h3 data-i18n="title">⚙️ Mascot Settings</h3>
+
+    <div class="setting-item">
+      <label for="lang-select" data-i18n="language">Language</label>
+      <select id="lang-select">
+        <option value="en">English</option>
+        <option value="fr">Français (French)</option>
+        <option value="it">Italiano (Italian)</option>
+        <option value="de">Deutsch (German)</option>
+        <option value="es">Español - España (Spanish - Spain)</option>
+        <option value="ar">العربية (Arabic)</option>
+        <option value="bg">Български (Bulgarian)</option>
+        <option value="cs">Čeština (Czech)</option>
+        <option value="da">Dansk (Danish)</option>
+        <option value="nl">Nederlands (Dutch)</option>
+        <option value="fi">Suomi (Finnish)</option>
+        <option value="el">Ελληνικά (Greek)</option>
+        <option value="hu">Magyar (Hungarian)</option>
+        <option value="id">Bahasa Indonesia (Indonesian)</option>
+        <option value="ja">日本語 (Japanese)</option>
+        <option value="ko">한국어 (Korean)</option>
+        <option value="ms">Bahasa Melayu (Malay)</option>
+        <option value="no">Norsk (Norwegian)</option>
+        <option value="pl">Polski (Polish)</option>
+        <option value="pt-BR">Português - Brasil (Portuguese - Brazil)</option>
+        <option value="pt-PT">Português - Portugal (Portuguese - Portugal)</option>
+        <option value="ro">Română (Romanian)</option>
+        <option value="ru">Русский (Russian)</option>
+        <option value="zh-CN">简体中文 (Simplified Chinese)</option>
+        <option value="es-419">Español - Latinoamérica (Spanish - Latin America)</option>
+        <option value="sv">Svenska (Swedish)</option>
+        <option value="th">ไทย (Thai)</option>
+        <option value="zh-TW">繁體中文 (Traditional Chinese)</option>
+        <option value="tr">Türkçe (Turkish)</option>
+        <option value="uk">Українська (Ukrainian)</option>
+        <option value="vi">Tiếng Việt (Vietnamese)</option>
+      </select>
+    </div>
     
     <div class="setting-item">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-        <label style="margin-bottom: 0;">Active Mascot</label>
-        <button id="refresh-previews-btn">Refresh Previews 🔄</button>
+        <label style="margin-bottom: 0;" data-i18n="active_mascot">Active Mascot</label>
+        <button id="refresh-previews-btn" data-i18n="refresh_previews">Refresh Previews 🔄</button>
       </div>
       <input type="hidden" id="model-select" value="procedural">
       <div id="model-select-grid" class="mascot-grid"></div>
     </div>
     
     <div class="setting-item" id="anim-select-container">
-      <label for="anim-select">Active Animation</label>
+      <label for="anim-select" data-i18n="active_animation">Active Animation</label>
       <select id="anim-select">
-        <option value="none">None (Static Pose)</option>
+        <option value="none" data-i18n="anim_static">None (Static Pose)</option>
       </select>
     </div>
 
     <div class="setting-item">
-      <label for="win-width">Window Width: <span id="val-width">350</span>px</label>
+      <label for="win-width"><span data-i18n="win_width">Window Width</span>: <span id="val-width">350</span>px</label>
       <input type="range" id="win-width" min="30" max="1920" value="350">
     </div>
     
     <div class="setting-item">
-      <label for="win-height">Window Height: <span id="val-height">350</span>px</label>
+      <label for="win-height"><span data-i18n="win_height">Window Height</span>: <span id="val-height">350</span>px</label>
       <input type="range" id="win-height" min="30" max="1080" value="350">
     </div>
     
     <div class="setting-item">
-      <label for="model-scale">Model Scale: <span id="val-scale">1.00</span>x</label>
+      <label for="model-scale"><span data-i18n="model_scale">Model Scale</span>: <span id="val-scale">1.00</span>x</label>
       <input type="range" id="model-scale" min="0.1" max="5.0" step="0.01" value="1.00">
     </div>
     
     <div class="setting-item">
-      <label for="font-scale">Panel Text Size: <span id="val-font-scale">1.00</span>x</label>
+      <label for="font-scale"><span data-i18n="font_scale">Panel Text Size</span>: <span id="val-font-scale">1.00</span>x</label>
       <input type="range" id="font-scale" min="0.8" max="2.0" step="0.05" value="1.00">
     </div>
     
     <div class="setting-item checkbox">
       <input type="checkbox" id="model-bobbing" checked>
-      <label for="model-bobbing">Enable Idle Bobbing</label>
+      <label for="model-bobbing" data-i18n="idle_bobbing">Enable Idle Bobbing</label>
     </div>
     
     <div class="setting-item checkbox">
       <input type="checkbox" id="lock-position">
-      <label for="lock-position">Lock Mascot Position</label>
+      <label for="lock-position" data-i18n="lock_position">Lock Mascot Position</label>
     </div>
     
     <div class="setting-item checkbox">
       <input type="checkbox" id="view-only">
-      <label for="view-only">View Only Mode (Fades on Hover) <span style="font-size: 10px; opacity: 0.7;">(Toggle with Ctrl + V)</span></label>
+      <label for="view-only"><span data-i18n="view_only">View Only Mode (Fades on Hover)</span> <span style="font-size: 10px; opacity: 0.7;" data-i18n="view_only_sub">(Toggle with Ctrl + V)</span></label>
     </div>
 
     <div class="setting-item checkbox">
       <input type="checkbox" id="gpu-optimize" checked>
-      <label for="gpu-optimize">Force High-Performance GPU <span style="font-size: 10px; opacity: 0.7;">(Requires Restart)</span></label>
+      <label for="gpu-optimize"><span data-i18n="gpu_optimize">Force High-Performance GPU</span> <span style="font-size: 10px; opacity: 0.7;" data-i18n="gpu_sub">(Requires Restart)</span></label>
     </div>
     
     <div class="setting-item checkbox">
       <input type="checkbox" id="mouse-optimize" checked>
-      <label for="mouse-optimize">Seamless Performance Mode <span style="font-size: 10px; opacity: 0.7;">(Throttled Proxy)</span></label>
+      <label for="mouse-optimize"><span data-i18n="mouse_optimize">Seamless Performance Mode</span> <span style="font-size: 10px; opacity: 0.7;" data-i18n="mouse_sub">(Throttled Proxy)</span></label>
     </div>
     
     <div class="setting-item checkbox">
       <input type="checkbox" id="settings-left">
-      <label for="settings-left">Place Settings Icon on Left</label>
+      <label for="settings-left" data-i18n="settings_left">Place Settings Icon on Left</label>
     </div>
     
     <div class="settings-section">
-      <h4>Axis Spinning</h4>
+      <h4 data-i18n="spin_controls">Axis Spinning</h4>
       <div class="spin-controls-grid">
         <div class="spin-row">
           <input type="checkbox" id="spin-x">
-          <label for="spin-x">X Axis</label>
+          <label for="spin-x" data-i18n="axis_x">X Axis</label>
           <input type="range" id="speed-x" min="-5.0" max="5.0" step="0.1" value="1.0">
           <span class="spin-val" id="val-speed-x">1.0</span>
         </div>
         <div class="spin-row">
           <input type="checkbox" id="spin-y">
-          <label for="spin-y">Y Axis</label>
+          <label for="spin-y" data-i18n="axis_y">Y Axis</label>
           <input type="range" id="speed-y" min="-5.0" max="5.0" step="0.1" value="1.0">
           <span class="spin-val" id="val-speed-y">1.0</span>
         </div>
         <div class="spin-row">
           <input type="checkbox" id="spin-z">
-          <label for="spin-z">Z Axis</label>
+          <label for="spin-z" data-i18n="axis_z">Z Axis</label>
           <input type="range" id="speed-z" min="-5.0" max="5.0" step="0.1" value="1.0">
           <span class="spin-val" id="val-speed-z">1.0</span>
         </div>
@@ -120,46 +152,46 @@
     </div>
     
     <div class="settings-section help-section">
-      <h4>🖱️ Viewport Controls (Blender Style)</h4>
+      <h4 data-i18n="viewport_controls">🖱️ Viewport Controls (Blender Style)</h4>
       <div class="help-grid">
         <div class="help-row">
-          <span>Orbit (Rotate)</span>
-          <strong>MMB (or Alt+Left) Drag</strong>
+          <span data-i18n="orbit">Orbit (Rotate)</span>
+          <strong data-i18n="orbit_sub">MMB (or Alt+Left) Drag</strong>
         </div>
         <div class="help-row">
-          <span>Pan (Translate)</span>
-          <strong>Shift + MMB (or Left) Drag</strong>
+          <span data-i18n="pan">Pan (Translate)</span>
+          <strong data-i18n="pan_sub">Shift + MMB (or Left) Drag</strong>
         </div>
         <div class="help-row">
-          <span>Zoom (Depth)</span>
-          <strong>Scroll (or Ctrl + MMB/Left)</strong>
+          <span data-i18n="zoom">Zoom (Depth)</span>
+          <strong data-i18n="zoom_sub">Scroll (or Ctrl + MMB/Left)</strong>
         </div>
         <div class="help-row">
-          <span>Orthographic Views</span>
-          <strong>Keys 1 (Front), 3 (Right), 7 (Top)</strong>
+          <span data-i18n="ortho">Orthographic Views</span>
+          <strong data-i18n="ortho_sub">Keys 1 (Front), 3 (Right), 7 (Top)</strong>
         </div>
         <div class="help-row">
-          <span>Opposite / Reset</span>
-          <strong>Key 9 (180°) / Key . or F (Reset)</strong>
+          <span data-i18n="reset_view">Opposite / Reset</span>
+          <strong data-i18n="reset_view_sub">Key 9 (180°) / Key . or F (Reset)</strong>
         </div>
       </div>
     </div>
     
     <!-- Collapsible Diagnostics Console -->
     <details class="settings-section diagnostics-details">
-      <summary style="font-weight: 500; cursor: pointer; user-select: none; outline: none;">🔍 Diagnostics & Logs</summary>
+      <summary style="font-weight: 500; cursor: pointer; user-select: none; outline: none;" data-i18n="diagnostics">🔍 Diagnostics & Logs</summary>
       <div class="diagnostics-container" style="margin-top: 8px;">
         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <button id="refresh-logs-btn" class="btn" style="flex: 1; padding: 4px 8px; font-size: 11px; cursor: pointer;">Refresh Logs</button>
-          <button id="clear-logs-btn" class="btn close" style="flex: 1; padding: 4px 8px; font-size: 11px; cursor: pointer;">Clear Logs</button>
+          <button id="refresh-logs-btn" class="btn" style="flex: 1; padding: 4px 8px; font-size: 11px; cursor: pointer;" data-i18n="refresh_logs">Refresh Logs</button>
+          <button id="clear-logs-btn" class="btn close" style="flex: 1; padding: 4px 8px; font-size: 11px; cursor: pointer;" data-i18n="clear_logs">Clear Logs</button>
         </div>
         <pre id="diagnostics-log-output" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 8px; font-family: Consolas, Monaco, monospace; font-size: 10px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a7f3d0; text-align: left; margin: 0;"></pre>
       </div>
     </details>
 
     <div class="settings-buttons">
-      <button id="save-btn" class="btn save">Save & Refresh</button>
-      <button id="close-btn" class="btn close">Close</button>
+      <button id="save-btn" class="btn save" data-i18n="btn_save">Save & Refresh</button>
+      <button id="close-btn" class="btn close" data-i18n="btn_close">Close</button>
     </div>
   </div>
 

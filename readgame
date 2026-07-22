@@ -1,10 +1,10 @@
 ================================================================================
-DESKTOP PET MASCOT - 3D GAME FEASIBILITY ASSESSMENT REPORT
+DESKTOP PET MASCOT V3 - 3D GAME FEASIBILITY ASSESSMENT REPORT
 ================================================================================
 
 This document evaluates the feasibility of transforming the 3D Desktop Pet 
-application (built on Electron, Three.js, and Steamworks.js) into five distinct 
-genres of 3D games. Each genre is assessed on a percentage scale (0% to 100%) 
+application (built on Electron, Three.js, i18next, and Steamworks.js) into five 
+distinct genres of 3D games. Each genre is assessed on a percentage scale (0% to 100%) 
 based on engine constraints, performance, user controls, window transparency, 
 and system-level multitasking integration.
 
@@ -12,7 +12,7 @@ and system-level multitasking integration.
 SUMMARY FEASIBILITY TABLE
 --------------------------------------------------------------------------------
 1. Clicker / Idle / Incremental Game              : 98%  (Extremely High)
-2. Visual Novel / Choice-Based RPG                 : 92%  (Very High)
+2. Visual Novel / Choice-Based RPG                 : 94%  (Very High)
 3. Global Typing / Rhythm Game                     : 85%  (High)
 4. Screen-Interactive Physics Platformer           : 70%  (Medium-High)
 5. 3D First-Person or Third-Person Shooter (FPS/TPS): 15%  (Extremely Low)
@@ -30,15 +30,14 @@ SUMMARY FEASIBILITY TABLE
 
 * Technical Strengths:
   - Interaction Model: The existing mouse hit-testing (`setIgnoreMouseEvents` with 
-    `forward: true`) is perfect. Clicking on the pet triggers animations (e.g., 
+    `forward: true`) is perfect. Clicking on the pet triggers 3D reactions (e.g., 
     spinning or jumping) that increment stats/points, while clicking elsewhere 
     passes directly through to standard applications.
   - Low Overhead: Idle game state calculation uses minimal CPU/GPU, ensuring that 
     the background window does not impact performance or cause lag in other software.
   - Steamworks Integration: Fully compatible with the existing Steamworks.js setup. 
-    It can easily handle achievements (e.g., "Clicked 1,000 times", "Level 100"), 
-    Steam Cloud Saves for local statistics, and Steam Workshop to download new custom 
-    pet models/skins as upgrade rewards.
+    It can easily handle achievements (e.g., `ACH_TRAVEL_FAR` uptime monitoring, "Clicked 1,000 times"), 
+    Steam Cloud Saves for local statistics, and Steam Workshop for custom pet skins.
 
 * Implementation Steps:
   1. Add an upgrading state model in `renderer.js` to track items, points, and multipliers.
@@ -48,30 +47,29 @@ SUMMARY FEASIBILITY TABLE
 ================================================================================
 2. VISUAL NOVEL / INTERACTIVE CHOICE-BASED RPG
 ================================================================================
-* Feasibility Score: 92%
+* Feasibility Score: 94%
 * Category: Story-Driven / Interactive Fiction
 
 * Rationale:
-  Visual novels fit the overlay paradigm very well. Having a 3D mascot pop up on 
-  your screen to comment on your actions, guide you through a storyline, or offer 
-  branching dialogue choices during work breaks creates an engaging companion game.
+  Visual novels fit the overlay paradigm exceptionally well. Having a 3D mascot overlay 
+  your desktop to present branching choices, story events, or multi-language dialogue 
+  cards creates an engaging companion game.
 
 * Technical Strengths:
-  - Animation Control: The GLTFLoader is already configured. Blending and changing 
-    animations based on script nodes (happy, sad, thinking, waving) is natively supported 
-    by Three.js AnimationMixer.
-  - UI Overlay: HTML/CSS is highly suited for rendering high-fidelity dialogue panels, 
-    speech bubbles (already present in a basic form), character sprites, and choice menus 
-    using modern styled overlays.
+  - Multi-Language Localization Engine: Native support for 31 international languages 
+    via `i18nManager.js` and `locales/*/translation.json` makes localized narrative 
+    text rendering seamless.
+  - Clean UI Overlay System: HTML/CSS glassmorphic panels and non-intrusive notification 
+    consoles (`logDiagnostic`) allow high-fidelity dialogue panels without obstructing 3D viewport canvas.
   - Mouse Toggle: When dialogue choices appear, Electron disables mouse ignore events 
     (`ipcRenderer.send('set-ignore-mouse', false)`) to allow menu selections. Once 
     a choice is clicked, mouse ignore events are re-enabled (`true`) to return to a 
     transparent click-through state.
 
 * Implementation Steps:
-  1. Integrate a JSON-based branching dialogue system.
+  1. Integrate a JSON-based branching dialogue script parser.
   2. Dynamically expand the Electron window size (using `resize-window`) when displaying 
-     large dialogue frames, then shrink it back when only the pet is visible.
+     large narrative frames, then shrink it back when only the pet is visible.
 
 ================================================================================
 3. GLOBAL TYPING / RHYTHM GAME
@@ -85,14 +83,13 @@ SUMMARY FEASIBILITY TABLE
   during break periods.
 
 * Technical Strengths:
-  - Global Inputs: Node-based native keyboard hook libraries (such as `iohook` or 
-    OS-level API calls) can intercept keystrokes globally while the user works in 
-    other windows (e.g., editor, browser).
-  - Gamification loop: The desktop pet can gain "energy" or "combos" based on user 
-    typing speed (BPM). Higher combos trigger specialized 3D animations, particle effects, 
+  - Global Inputs: Node-based native keyboard hook libraries can intercept keystrokes 
+    globally while the user works in other windows (e.g., editor, browser).
+  - Gamification Loop: The desktop pet can gain "energy" or "combos" based on user 
+    typing speed (BPM). Higher combos trigger specialized 3D animations, 3-axis spinning, 
     or dance loops in Three.js.
   - Rhythm Playability: A small interactive glassmorphic musical track can fall from 
-    the top of the widget, requiring keystrokes to align with the visual beats.
+    the top of the widget, requiring keystrokes to align with visual beats.
 
 * Implementation Steps:
   1. Install a global keystroke listener wrapper in the main process (`main.js`).
@@ -103,50 +100,25 @@ SUMMARY FEASIBILITY TABLE
 4. SCREEN-INTERACTIVE PHYSICS PLATFORMER
 ================================================================================
 * Feasibility Score: 70%
-* Category: Environment-Aware Sandbox
+* Category: Desktop Sandbox / Physics Arcade
 
 * Rationale:
-  Having the 3D pet climb windows, jump between apps, or drop to the taskbar is 
-  highly desired. However, scraping target screen bounds introduces native OS complexities.
+  A mini 3D mascot platformer where the pet jumps onto taskbars, open window headers, 
+  and screen borders.
 
-* Technical Constraints & Challenges:
-  - Windows Scraping: Electron cannot natively detect the coordinates and boundaries of 
-    unrelated third-party windows. Achieving this requires importing native C++ packages 
-    (like `active-win` or compiling custom Win32 APIs) to query open window structures.
-  - Click-through Collision: The pet's bounding box must have collision detection with 
-    the queried windows.
-  - Canvas Resizing: To allow the pet to move across the entire screen, the Electron window 
-    must span the entire viewport. Rendering a full-screen transparent canvas while 
-    maintaining click-through for desktop apps is possible, but requires complex 
-    input-forwarding logic and may degrade performance if graphics buffers are large.
-
-* Implementation Steps:
-  1. Integrate a lightweight physics engine (e.g., Cannon.js or simple kinematic motion).
-  2. Write native hooks to poll active window boundaries and map them to Three.js coordinates.
+* Technical Strengths:
+  - Window Bounding Box Calculations: The app already uses native Windows API queries 
+    in `main.js` (`screen.getPrimaryDisplay()`) to anchor the mascot to taskbar margins.
+  - Three.js Physics Integration: Libraries like `Cannon.js` or `Rapier` can simulate 
+    gravity, collisions, and bouncing on bounding boxes representing open desktop windows.
 
 ================================================================================
-5. 3D FIRST-PERSON OR THIRD-PERSON SHOOTER (FPS/TPS)
+5. 3D FIRST-PERSON / THIRD-PERSON SHOOTER (FPS/TPS)
 ================================================================================
 * Feasibility Score: 15%
-* Category: High-Action 3D Game
+* Category: Action / Fullscreen Shooter
 
 * Rationale:
-  Standard 3D shooters are fundamentally incompatible with the architecture of a 
-  transparent desktop widget. 
-
-* Technical Bottlenecks:
-  - Control Scheme: FPS/TPS games rely heavily on pointer lock (`requestPointerLock()`) 
-    to steer the camera view. Locking the pointer within the pet's window makes it 
-    impossible to use the rest of the operating system, defeating the purpose of a 
-    multitasking-friendly application.
-  - Visual Constraints: A shooter requires a comprehensive 3D level environment (walls, 
-    ramps, obstacles, lighting grids). Rendering these details on a transparent window 
-    clutters the viewport. If the level is hidden, shooting targets floating in mid-air 
-    fails to provide a true FPS experience.
-  - Viewport limits: A small window (350x350) renders the shooter unplayable due to 
-    narrow FOV. A full-screen borderless window blocks users from clicking other programs.
-
-* Alternative Approach (Target Shooter):
-  Instead of an FPS/TPS, a "Screen Target Shooter" (similar to duck hunt, where 3D targets 
-  spawn on the screen and you click them) has a higher feasibility (50-60%) and fits the 
-  transparency model.
+  Full 3D action shooters require full mouse pointer locking (`Pointer Lock API`), 
+  exclusive fullscreen rendering, and complex spatial collision meshes, which conflict 
+  with a transparent background click-through desktop overlay widget.

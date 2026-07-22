@@ -1,5 +1,5 @@
 ================================================================================
-STEAM LAUNCH GUIDE: SELLING YOUR 3D DESKTOP PET ON STEAM
+STEAM LAUNCH GUIDE: SELLING YOUR 3D DESKTOP PET ON STEAM V3
 ================================================================================
 
 This document details the complete process, technical integrations, and storefront
@@ -13,7 +13,7 @@ To publish software on Steam, you must register as a Steamworks developer:
 1. Registration: Sign up at https://partner.steamgames.com/ using a Steam account.
 2. Submission Fee: Pay the Steam Direct fee ($100 USD per product; fully refundable
    once the app reaches $1,000 USD in adjusted gross revenue).
-3. Verification: Complete the digital tax interviews and identity verification
+3. Verification: Complete digital tax interviews and identity verification
    (takes 2-7 days).
 4. App ID Allocation: Once verified, Steam allocates a unique App ID for your
    desktop pet.
@@ -21,57 +21,44 @@ To publish software on Steam, you must register as a Steamworks developer:
 --------------------------------------------------------------------------------
 2. TECHNICAL ADJUSTMENTS FOR STEAM (ELECTRON INTEGRATION)
 --------------------------------------------------------------------------------
-To connect Electron to Valve's native C++ Steamworks APIs, we need a Node.js wrapper.
+This application features native Steamworks SDK integration via `@skyatnpm/steamworks-js`:
 
-* SDK Wrapper Options:
-  1. steamworks.js (Recommended): A modern, actively-maintained Node.js binding
-     for the Steamworks SDK using N-API.
-     Install via: `npm install steamworks.js`
-  2. greenworks: A legacy native Node addon. Harder to compile for modern Node/Electron.
-
-* Initializing Steamworks API in main.js:
-  Add the following code to register the app with Steam and ensure it is launched
-  properly (Steam must be running):
+* Implemented SDK Binding (`main.js`):
+  - Native initialization using `@skyatnpm/steamworks-js` with App ID `480`.
+  - Built-in `MockSteamClient` fallback handler allowing offline execution without crashes when Steam is not running.
   ```javascript
-  const steamworks = require('steamworks.js');
+  let steamClient = null;
   try {
-    // Replace 480 with your actual Steam App ID
-    const client = steamworks.init(480);
-    console.log("Steamworks API initialized. User:", client.localUser.getSteamId());
+    const steamworks = require('@skyatnpm/steamworks-js');
+    steamClient = steamworks.init(480);
+    logDiagnostic('[Steamworks] Initialized successfully. App ID: 480');
   } catch (err) {
-    console.error("Steamworks failed to initialize:", err);
+    logDiagnostic('[Steamworks] Offline or fallback mode active: ' + err.message);
   }
   ```
 
 * Handling Steam Overlay with Transparency:
-  - Steam's overlay hook injects graphics into the window. Because this application
-    uses a borderless, transparent window framework, the Steam overlay can cause visual
-    glitches or break the alpha channel transparency.
-  - Fix: In settings, disable the Steam overlay for your App ID inside the Steamworks
-    partner console, or configure launcher flags to bypass rendering hooks.
+  - Listens for `gameOverlayActivated` events to maintain mouse click-through behavior and avoid transparency artifacts.
+  - Includes a frame repaint invalidator (`steamworksRepaintInterval`, 60 FPS) in `main.js` to ensure the Steam overlay renders smoothly.
 
 --------------------------------------------------------------------------------
-3. HIGH-VALUE STEAM FEATURES (DRIVING RETENTION & engagement)
+3. HIGH-VALUE STEAM FEATURES (DRIVING RETENTION & ENGAGEMENT)
 --------------------------------------------------------------------------------
 Integrating Steam features increases app visibility and user satisfaction:
 
-* Steam Workshop Integration (CRITICAL FOR MONETIZATION):
-  - Allow users to share and download custom 3D models (.glb/.gltf) directly inside Steam.
+* Steam Workshop Integration:
+  - Allow users to share and download custom 3D models (`.glb`/`.gltf`) directly inside Steam.
   - How it works: Use Steamworks API to query subscribed Workshop items, copy files
-    to the `assets/` directory, and dynamically populate them in our Mascot Dropdown.
-  - Why: Creates a self-sustaining user community, mimicking Wallpaper Engine's model.
+    to the `assets/` directory, and dynamically populate them in our Mascot selection grid with previews (`.previews/`).
 
-* Steam Achievements:
-  - Add achievements linked to app usage, such as:
-    - "First Steps" (Load a custom 3D model).
-    - "Stay Hydrated" (Acknowledge 50 hydration break notifications).
-    - "Dizzy" (Click the pet to spin it 100 times).
-  - Code trigger: `client.achievements.activate('ACH_FIRST_STEPS')`
+* Implemented Steam Achievements:
+  - `ACH_HEAVY_RADAR`: Triggered when the user saves updated settings configuration inside the Settings Panel.
+  - `ACH_TRAVEL_FAR`: Triggered by a background 20-minute uptime monitor timer in `main.js`.
+  - Code trigger: `steamClient.userStats.setAchievement('ACH_HEAVY_RADAR')`
 
 * Cloud Saves:
-  - Configure Steam Cloud to sync the local `assets/settings` file.
-  - Ensures users keep their scaling preferences, selected active mascot, and spin configuration
-    across different computers.
+  - Configure Steam Cloud to sync `assets/settings`.
+  - Ensures users keep their scaling preferences, selected active mascot, 3-axis spin speeds, and language settings across computers.
 
 --------------------------------------------------------------------------------
 4. STEAM STOREFRONT & MARKETING STRATEGY
@@ -82,16 +69,9 @@ To maximize conversions, tailor your store page graphics and messaging:
   - Main Category: Software / Utilities.
   - Primary Tags: "Desktop Utility", "Casual", "Cute", "Relaxing", "3D", "Moddable".
 
-* Core Marketing Assets (Store Capsules):
-  - Create vibrant, eye-catching banners highlighting the cute bunny or loaded custom avatars.
-  - Trailer: Show a screen recording of the pet floating next to a coding editor, climbing
-    windows, popping up hydration reminders, and reacting to clicks. Emphasize that it is
-    borderless and fully transparent.
-
-* Localization Targets:
-  - Desktop companions are highly popular in East Asian and Western tech markets.
-  - Translate the store description, settings menu, and speech bubble dialogue to:
-    - Simplified/Traditional Chinese, Japanese, Korean, English, German, and Spanish.
+* Full 31-Language Storefront Localization:
+  - The application includes complete 31-language UI translation files inside `/locales`.
+  - Translate the Steam Store description, tags, and capsule text into all 31 supported languages to maximize global reach (Americas, Europe, Eurasia, Asia, and Middle East).
 
 * Pricing Model:
   - Recommended Price Point: $1.99 - $3.99 USD.

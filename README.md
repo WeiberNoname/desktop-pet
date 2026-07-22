@@ -1,9 +1,9 @@
 <img width="400" height="236" alt="Recording 2026-07-04 002226" src="https://github.com/user-attachments/assets/ec017b5e-f488-409f-ae98-e225e1fadb53" />
 
 
-# 3D Transparent Desktop Mascot Pet 🐰
+# 3D Transparent Desktop Mascot Pet 🐰 (V3)
 
-A floating, borderless, fully transparent (RGBA 0,0,0,0) 3D interactive companion pet application for Windows, powered by **Electron** and **Three.js (WebGL)**.
+A floating, borderless, fully transparent (RGBA 0,0,0,0) 3D interactive companion pet application for Windows, powered by **Electron**, **Three.js (WebGL)**, and **i18next**.
 
 The mascot floats on top of your working windows, bobbing gently. It captures clicks and drags when hovered directly, and passes clicks straight through to the applications underneath when clicking in transparent areas.
 
@@ -15,7 +15,7 @@ The mascot floats on top of your working windows, bobbing gently. It captures cl
 Perfect for instant use without running terminal commands.
 
 1. Open **File Explorer** and navigate to:
-   [DesktopPet-win32-x64](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/DesktopPet-win32-x64)
+   [DesktopPet-win32-x64](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/DesktopPet-win32-x64)
 2. Double-click **`DesktopPet.exe`** to start your pet mascot.
 
 > [!TIP]
@@ -29,35 +29,51 @@ Ideal if you want to inspect, debug, or extend the JavaScript source files.
 1. Ensure [Node.js](https://nodejs.org) is installed.
 2. Open terminal and navigate to the project directory:
    ```bash
-   cd C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet
+   cd "C:\Users\space\.gemini\antigravity-ide\scratch\desktop-pet V3"
    ```
-+. Installation(Local node_modules folder is missing or incomplete.):
+3. Install dependencies:
    ```bash
    npm install
    ```
-<img width="750" height="170" alt="Screenshot 2026-07-05 143120" src="https://github.com/user-attachments/assets/8bd55513-383d-454c-a276-17406037c749" />
-
-   
-3. Start the dev app:
+4. Start the dev app:
    ```bash
    npm start
    ```
-4. Recompile the production executable after modifying code:
+5. Recompile the production executable after modifying code:
    ```bash
    npm run build
-   ## 🕹️ Controls & Interaction Guide
+   ```
+
+---
+
+## 🌍 Multi-Language (i18n) Support (31 Languages)
+
+Desktop Pet V3 includes an enterprise-grade internationalization system built on the **i18next framework**. The application automatically detects your operating system locale or allows you to select any of the **31 supported languages** directly from the Settings Panel:
+
+| Region / Scope | Supported Languages & Locales |
+| :--- | :--- |
+| **Americas & Europe** | English (`en`), French (`fr`), Italian (`it`), German (`de`), Spanish - Spain (`es`), Spanish - Latin America (`es-419`), Portuguese - Brazil (`pt-BR`), Portuguese - Portugal (`pt-PT`), Dutch (`nl`), Danish (`da`), Finnish (`fi`), Norwegian (`no`), Swedish (`sv`) |
+| **Eastern Europe & Eurasia** | Russian (`ru`), Ukrainian (`uk`), Polish (`pl`), Czech (`cs`), Hungarian (`hu`), Bulgarian (`bg`), Romanian (`ro`), Greek (`el`), Turkish (`tr`) |
+| **Asia & Middle East** | Simplified Chinese (`zh-CN`), Traditional Chinese (`zh-TW`), Japanese (`ja`), Korean (`ko`), Vietnamese (`vi`), Thai (`th`), Bahasa Indonesia (`id`), Bahasa Melayu (`ms`), Arabic (`ar`) |
+
+* **Dynamic Locale Switching**: Changing the language instantly updates all panel headers, labels, view control guides, and diagnostics buttons without restarting.
+* **Global Typography Fallbacks**: Integrated CJK font stacks (`PingFang SC`, `Hiragino Sans`, `Meiryo`, `Malgun Gothic`, `Noto Sans CJK`) and RTL styling for seamless international text rendering.
+
+---
+
+## 🕹️ Controls & Interaction Guide
 
 | Mouse / Key Action | Target | Description |
 | :--- | :--- | :--- |
 | **Hover** | Over character | Cursor changes to a pointer, enabling interaction. |
-| **Left Click** | On character | Procedural mascot: plays jump and spin. Custom models: plays animation loop at accelerated speed (no jump). |
-| **Left Click + Drag** | On character / Cog Button / Panel Background | Smoothly repositions the mascot window anywhere on your monitor(s). (Excludes sliders, buttons, or inputs). |
+| **Left Click** | On character | Procedural mascot: plays jump and spin. Custom models: plays animation loop at accelerated speed. |
+| **Left Click + Drag** | On character / Cog Button / Panel Background | Smoothly repositions the mascot window anywhere on your monitor(s). |
 | **Alt + Left-Drag** (or MMB-Drag) | Anywhere | **Orbit View (3D Rotate):** Changes the 3D view perspective, rotating the pet. |
 | **Shift + Left-Drag** | Anywhere | **Pan View (3D Translate):** Moves the pet model up/down and left/right inside the canvas boundaries. |
-| **Scroll Wheel** (or Ctrl + Left-Drag) | Anywhere | **Zoom View (3D Scale/Depth):** Moves the pet model closer or further away (adjusts Z position). |
+| **Scroll Wheel** (or Ctrl + Left-Drag) | Anywhere | **Zoom View (3D Scale/Depth):** Moves the pet model closer or further away. |
 | **Alt + Double-Click** | On mascot | **Reset View:** Instantly centers and resets the model's 3D orientation back to default. |
 | **Click** | Outside character | Passed through to the folders, IDE, or browser behind the window. |
-| **Hover ➔ Click ⚙️** | Left or Right edge | Toggles (Opens or Closes) the glassmorphic Settings Panel (bypassed if button is dragged). |
+| **Hover ➔ Click ⚙️** | Left or Right edge | Toggles (Opens or Closes) the glassmorphic Settings Panel. |
 | **Ctrl + V** | Globally | Toggles **View Only Mode** on/off (only active when not typing inside input fields). |
 
 ---
@@ -67,13 +83,13 @@ Ideal if you want to inspect, debug, or extend the JavaScript source files.
 The app automatically detects, centers, and displays any 3D asset:
 
 * **Drag-and-Drop Loader**: Simply drag any `.glb` or `.gltf` file directly from Windows Explorer and drop it onto the pet's window. The app will automatically copy the file into the `assets/` folder and load it immediately.
-* **Auto-Grounding**: Bounding boxes are calculated automatically to scale the mascot and anchor its base/feet flush with the taskbar, preventing floating or clipping.
-* **Auto-Animation Mapping**: Inspects animation clips and automatically maps idle tracks (containing `"idle"`, `"stay"`, `"breathe"`) and click reactions (containing `"jump"`, `"spin"`, `"click"`, `"react"`).
+* **Auto-Grounding**: Bounding boxes are calculated automatically to scale the mascot and anchor its feet flush with the taskbar, preventing floating or clipping.
+* **Auto-Animation Mapping**: Inspects animation clips and automatically maps idle tracks (`"idle"`, `"stay"`, `"breathe"`) and click reactions (`"jump"`, `"spin"`, `"click"`, `"react"`).
 
 Alternatively, you can manually manage models:
 1. Locate the **`assets/`** folder:
-   - Development path: [assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/assets)
-   - Executable path: [DesktopPet-win32-x64/assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/DesktopPet-win32-x64/assets)
+   - Development path: [assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/assets)
+   - Executable path: [DesktopPet-win32-x64/assets/](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/DesktopPet-win32-x64/assets)
 2. Drop any **`.glb`** or **`.gltf`** model file into this directory.
 3. Reload or select it inside the Settings Panel.
 4. **Fallback:** If you empty the `assets/` folder, the application immediately falls back to rendering the default pink bunny mascot.
@@ -82,87 +98,45 @@ Alternatively, you can manually manage models:
 
 ## ⚙️ Interactive Settings Panel
 
-You can enable an overlay settings panel by adding a configuration file:
-
-1. **How to Enable:** Place a text file named **`settings`** (or `settings.txt`) in your `assets/` folder.
-   - **Note:** If this file is missing, the application **automatically creates it** on startup with default values, meaning the settings panel is always active out-of-the-box!
+1. **How to Enable:** Place a text file named **`settings`** (or `settings.txt`) in your `assets/` folder. (Automatically created on first launch).
 2. **Accessing the Panel:** Hover your mouse cursor over the mascot. A gear icon `⚙️` will appear. Click it to toggle the Settings Panel open or closed.
 3. **Editable Settings:**
+   - **Language**: Select your preferred interface language from **31 international options**.
    - **Active Mascot**: Select between the default procedural bunny and custom models dropped in the `assets/` folder.
-   - **Active Animation**: Dynamically lists and plays the model's embedded animation clips, plus a **None (Static Pose)** option to freeze active loops. (Only active when a custom model is loaded).
-   - **Window Width & Height:** Adjust the window dimensions from a minimal **30px** up to your **full computer screen size**.
-   - **Model Scale:** Manually zoom/scale the 3D character from **0.10x** to **5.00x** with ultra-precise **0.01** step increments.
+   - **Active Animation**: Lists and plays the model's embedded animation clips, plus a **None (Static Pose)** option.
+   - **Window Width & Height:** Adjust window dimensions from **30px** up to full monitor resolution.
+   - **Model Scale:** Zoom/scale the 3D character from **0.10x** to **5.00x** with **0.01** step precision.
    - **Panel Text Size:** Scalable slider from **0.80x** to **2.00x** to dynamically resize settings panel typography.
-   - **Enable Idle Bobbing:** Checkbox to toggle the slow floating vertical idle animation.
-   - **View Only Mode**: Enable transparency on hover. When checked (or toggled with `Ctrl + V`), the pet smoothly fades to fully transparent (`opacity = 0.0`) when your mouse enters the area, allowing clicks to pass directly to applications underneath.
+   - **Enable Idle Bobbing:** Toggle the slow floating vertical idle animation.
+   - **View Only Mode**: Enable transparency on hover (`Ctrl + V`). The pet fades to fully transparent when your mouse enters the area.
    - **Lock Mascot Position**: Freeze window coordinates to prevent accidental dragging.
-   - **Force High-Performance GPU:** Toggle whether the app automatically requests discrete high-speed graphics. *(Requires restart to apply)*.
-   - **Seamless Performance Mode:** Toggle between Seamless Mode (throttled proxy raycasting) and Precise Mode (full triangle raycasting).
-   - **Place Settings Icon on Left:** Checkbox to shift the gear button `⚙️` position to the top-left margin.
-   - **Axis Spinning (X, Y, and Z):** Enable continuous rotation spinning on the X, Y, and/or Z axes. Each axis has its own checkbox and speed slider.
-4. **Resizing Sync & Revert Rules:**
-   - Sliders and select options update only their numerical text labels/values in real-time while dragging/changing in the panel.
-   - Changes are applied to the window and model **only when you click "Save & Refresh"**.
-   - Clicking **"Close"** or clicking the **Gear Button** again cancels changes and reverts parameters to last saved states.
+   - **Force High-Performance GPU:** Request discrete high-speed graphics card. *(Requires restart)*.
+   - **Seamless Performance Mode:** Toggle between Seamless Mode (throttled proxy raycasting) and Precise Mode.
+   - **Place Settings Icon on Left:** Shift gear button `⚙️` position to the top-left margin.
+   - **Axis Spinning (X, Y, and Z):** Enable continuous rotation spinning on X, Y, and Z axes with independent speed sliders.
 
 ---
 
-## ⚡ Performance Optimization & GPU Troubleshooting (Dual-GPU Laptops)
+## ⚡ Performance & Clean Architecture Notes (V3 Refactoring)
 
-On Windows laptops equipped with both integrated (Intel) and dedicated (NVIDIA/AMD) graphics cards, the OS may default the mascot to run on the low-power integrated chip, which can cause frame stuttering. 
-
-While the application code automatically requests high-performance discrete graphics internally, certain Windows battery-saving profiles can override this. If you experience lags, apply one of the following overrides:
-
-### Override A: Windows OS Graphics Settings (Recommended)
-1. Open the Windows **Start Menu**, search for **Graphics Settings**, and press Enter.
-2. Under "Graphics performance preference", set the dropdown to **Desktop app** and click **Browse**.
-3. Select **`DesktopPet.exe`** from your compiled output directory.
-4. Click on the newly added "DesktopPet" app listing, and click the **Options** button.
-5. Select **High performance** (your dedicated NVIDIA/AMD graphics card will be listed here) and click **Save**.
-
-### Override B: NVIDIA Control Panel Setup
-1. Right-click on your Windows desktop and select **NVIDIA Control Panel**.
-2. Select **Manage 3D Settings** in the left navigation sidebar.
-3. Open the **Program Settings** tab and click the **Add** button.
-4. Select **`DesktopPet.exe`** from the browser options.
-5. Change the preferred graphics processor choice to **High-performance NVIDIA processor** and click **Apply**.
+* **Dialogue System Purge (Approach C)**: Speech bubble popups and idle text timers were purged in V3 to maximize render loop performance (`60 FPS`) and keep runtime code lean.
+* **Central Diagnostics Console**: System alerts and config recovery messages are now output directly to the collapsible Diagnostics Console (`assets/diagnostics.log`), keeping the visual canvas unobstructed.
+* **Decoupled Steam Achievements**: Uptime achievements (`ACH_TRAVEL_FAR`) operate via an independent background monitor in [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/main.js), completely decoupled from UI popups.
 
 ---
 
-## 🛡️ Robustness, Diagnostics & Debuggability
+## 🛡️ Robustness & Troubleshooting
 
-The application includes several advanced fail-safes, troubleshooting tools, and stability enhancements:
-
-* **Sub-Viewport Canvas Margins**: Added a 10px padding constraint on the HTML container and scaled the Three.js viewport accordingly. Wired a DOM event target validation (`event.target.tagName !== 'CANVAS'`) in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L457-L466) to instantly reset hover states and clear click-through when the cursor enters the transparent padding border or exits the window.
-* **Main Process Edge Check Polling**: Runs a 100ms interval polling query inside [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L201-L235) whenever click-through is enabled, checking absolute cursor positions and triggering forced hover exits if the cursor crosses outer window boundaries.
-* **Central Diagnostics Logging**: Introduced a formatted diagnostics trace utility in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L12-L37) that logs startup initialization states, Steamworks connections, IPC requests, and file write histories. Traces are persisted to `assets/diagnostics.log` (with size-limiting self-truncation fallback).
-* **Collapsible Diagnostics UI Console**: Implemented a diagnostics console container inside the Settings Panel with options to refresh and clear system traces.
-* **Developer Mode CLI Option (`--dev`)**: Launching the application with `--dev` (e.g. `DesktopPet.exe --dev`) bypasses click-through opacity toggling, auto-opens Chromium DevTools in detached view, and overlays a red dashed guide border indicating the physical window boundaries.
-* **Config Reset Warnings**: Promoted settings recovery awareness by raising startup warnings (`⚠️ Config File Corrupted:\nDefault settings restored!`) inside the pet's notification speech bubble when settings files healed successfully.
-* **Atomic Settings Writing & Self-Healing State Recovery**: Integrated atomic file-system writes via temporary file staging and synchronous renaming in [renderer.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js#L1262). Additionally, built a self-healing parsing system that safely catches configuration corruptions, resets options to default values in memory, and auto-rewrites the config file to recover.
-* **Offline Steamworks Mock Interface**: Added a mock Steam Client helper (`MockSteamClient` in [main.js](file:///c:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js#L46-L75)) that serves as a fallback when Steam is offline, allowing in-app achievement speech bubbles to trigger normally without console exceptions.
+* **Sub-Viewport Canvas Margins**: 10px padding constraint on HTML container with DOM target validation (`event.target.tagName !== 'CANVAS'`) in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/renderer.js) to instantly reset hover states and clear click-through.
+* **Main Process Edge Check Polling**: 100ms interval query in [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/main.js) checking cursor positions and forcing hover exits when crossing boundaries.
+* **Atomic Settings Staging**: Atomic writes via temporary file staging and synchronous renaming in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet%20V3/renderer.js) to prevent settings file corruption during unexpected shutdowns.
+* **Offline Steamworks Mock**: Built-in `MockSteamClient` fallback when Steam is offline, allowing in-app achievements to trigger smoothly.
 
 ---
 
-> [!NOTE]
-> To modify the source scripts, open the project inside your editor and make changes directly in [renderer.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/renderer.js) or [main.js](file:///C:/Users/space/.gemini/antigravity-ide/scratch/desktop-pet/main.js).
-
----
-
-### ⚠️ PowerShell Build Error Troubleshooting
-If you encounter this error when running the build command in PowerShell:
-```
-npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because running scripts is disabled on this system. For
-more information, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170.
-At line:1 char:1
-+ npm run build
-+ ~~~
-    + CategoryInfo          : SecurityError: (:) [], PSSecurityException
-    + FullyQualifiedErrorId : UnauthorizedAccess
-```
-
-You can resolve it by running this command in PowerShell to bypass the policy for the current session:
+### ⚠️ PowerShell Build Troubleshooting
+If running `npm run build` in PowerShell returns an execution policy restriction error:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 ```
-Or build from standard Windows command prompt (`cmd`).
+Or build directly using standard Windows Command Prompt (`cmd`).

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import { initI18n, t, changeLanguage, getCurrentLanguage } from './i18nManager.js';
 
 const { ipcRenderer } = window.require('electron');
 const fs = window.require('fs');
@@ -34,13 +35,11 @@ let currentSettings = {
   activeModel: 'procedural',
   activeAnimation: 'default',
   clickCount: 0,
-  fontSizeScale: 1.0
+  fontSizeScale: 1.0,
+  language: 'en'
 };
 
 let discoveredModels = [];
-let speechTimeout = null;
-let lastIdleThoughtTime = Date.now();
-let lastBreakReminderTime = Date.now();
 
 // Helper function to update gear position dynamically
 function updateGearPosition() {
@@ -89,7 +88,7 @@ let animationState = {
   duration: 1000 // ms
 };
 
-function init() {
+async function init() {
   const container = document.getElementById('container');
 
   // Query if application is running in developer mode
@@ -100,6 +99,9 @@ function init() {
   
   // Load settings configuration file if it exists in assets/
   hasSettingsFile = readSettingsFile();
+
+  // Initialize i18next multi-language framework
+  await initI18n(currentSettings.language);
 
   const settingsPanel = document.getElementById('settings-panel');
   if (settingsPanel && currentSettings.fontSizeScale) {
@@ -159,14 +161,9 @@ function init() {
   // 7. Start Animation Loop
   animate();
 
-  // Trigger startup greeting speech bubble or config corruption recovery warning
-  setTimeout(() => {
-    if (wasConfigHealed) {
-      showSpeechBubble("⚠️ Config File Corrupted:\nDefault settings restored!", 6000);
-    } else {
-      showSpeechBubble("Hi there! I'm your desktop pet! 🐰✨", 4000);
-    }
-  }, 1800);
+  if (wasConfigHealed) {
+    ipcRenderer.send('log-diagnostic', '[Config Recovery] Default settings restored due to config file issue.');
+  }
 
   // Handle Resize
   window.addEventListener('resize', onWindowResize);
@@ -805,46 +802,7 @@ function setupInteraction() {
   });
 }
 
-function showSpeechBubble(text, durationMs = 3000) {
-  const bubble = document.getElementById('speech-bubble');
-  const textEl = document.getElementById('bubble-text');
-  if (!bubble || !textEl) return;
-  
-  if (speechTimeout) {
-    clearTimeout(speechTimeout);
-    speechTimeout = null;
-  }
-  
-  textEl.textContent = text;
-  bubble.classList.remove('hidden');
-  bubble.classList.add('show');
-  
-  if (durationMs > 0) {
-    speechTimeout = setTimeout(() => {
-      bubble.classList.remove('show');
-      setTimeout(() => {
-        if (!bubble.classList.contains('show')) {
-          bubble.classList.add('hidden');
-        }
-      }, 200);
-    }, durationMs);
-  }
-}
 
-function hideSpeechBubble() {
-  const bubble = document.getElementById('speech-bubble');
-  if (!bubble) return;
-  if (speechTimeout) {
-    clearTimeout(speechTimeout);
-    speechTimeout = null;
-  }
-  bubble.classList.remove('show');
-  setTimeout(() => {
-    if (!bubble.classList.contains('show')) {
-      bubble.classList.add('hidden');
-    }
-  }, 200);
-}
 
 function triggerInteraction() {
   if (animationState.type === 'interact') return;
@@ -1193,7 +1151,8 @@ viewOnly=false
 activeModel=procedural
 activeAnimation=default
 clickCount=0
-fontSizeScale=1.0`;
+fontSizeScale=1.0
+language=en`;
 
   // If no settings file exists anywhere on startup, automatically generate a default one
   if (!filePath) {
@@ -1247,6 +1206,7 @@ fontSizeScale=1.0`;
           if (key === 'activeAnimation') { currentSettings.activeAnimation = val || 'default'; validKeysParsed++; }
           if (key === 'clickCount') { currentSettings.clickCount = parseInt(val, 10) || 0; validKeysParsed++; }
           if (key === 'fontSizeScale') { currentSettings.fontSizeScale = parseFloat(val) || 1.0; validKeysParsed++; }
+          if (key === 'language') { currentSettings.language = val || 'en'; validKeysParsed++; }
         }
       });
       if (validKeysParsed === 0) {
@@ -1278,6 +1238,7 @@ fontSizeScale=1.0`;
       currentSettings.activeAnimation = 'default';
       currentSettings.clickCount = 0;
       currentSettings.fontSizeScale = 1.0;
+      currentSettings.language = 'en';
       
       // Attempt recovery write
       try {
@@ -1318,7 +1279,8 @@ viewOnly=${currentSettings.viewOnly}
 activeModel=${currentSettings.activeModel}
 activeAnimation=${currentSettings.activeAnimation}
 clickCount=${currentSettings.clickCount}
-fontSizeScale=${currentSettings.fontSizeScale}`;
+fontSizeScale=${currentSettings.fontSizeScale}
+language=${currentSettings.language}`;
 
   try {
     const tmpPath = filePath + '.tmp';
@@ -1615,12 +1577,13 @@ function forceRefreshAllPreviews() {
   // Trigger background preview generator queue to recreate previews offscreen
   startBackgroundPreviewGenerator();
   
-  showSpeechBubble("Refreshing mascot thumbnails! 🔄", 2500);
+  ipcRenderer.send('log-diagnostic', '[Preview Refresh] All mascot thumbnail previews refreshed.');
 }
 
 function setupSettingsUI() {
   const gearBtn = document.getElementById('settings-btn');
   const panel = document.getElementById('settings-panel');
+  const langSelect = document.getElementById('lang-select');
   const widthSlider = document.getElementById('win-width');
   const heightSlider = document.getElementById('win-height');
   const scaleSlider = document.getElementById('model-scale');
@@ -1711,6 +1674,9 @@ function setupSettingsUI() {
 
   // Sync sliders UI with the saved settings
   const syncSlidersUI = () => {
+    if (langSelect) {
+      langSelect.value = currentSettings.language || 'en';
+    }
     widthSlider.value = currentSettings.width;
     heightSlider.value = currentSettings.height;
     scaleSlider.value = currentSettings.scale;
@@ -1823,8 +1789,13 @@ function setupSettingsUI() {
   });
 
   // Apply changes only when user clicks "Save Settings"
-  document.getElementById('save-btn').addEventListener('click', () => {
+  document.getElementById('save-btn').addEventListener('click', async () => {
     // 1. Update saved settings state
+    if (langSelect && langSelect.value !== currentSettings.language) {
+      currentSettings.language = langSelect.value;
+      await changeLanguage(currentSettings.language);
+    }
+
     currentSettings.width = parseInt(widthSlider.value, 10);
     currentSettings.height = parseInt(heightSlider.value, 10);
     currentSettings.scale = parseFloat(scaleSlider.value);
@@ -1972,45 +1943,6 @@ function setupSettingsUI() {
   }
 }
 
-const idleThoughts = [
-  "Is it time for coffee yet? ☕",
-  "Just floating around... ☁️",
-  "You're doing amazing! Keep it up! ✨",
-  "I love floating here with you! 😊",
-  "Need a break soon? 🧘",
-  "What a beautiful day! 🌸",
-  "La la la~ 🎶",
-  "Let's stay focused! 💻"
-];
-
-const breakReminders = [
-  "Time for a quick water break! 💧 Stay hydrated!",
-  "Posture check! Roll your shoulders and sit up straight! 🧘",
-  "Give your eyes a 20-second break! Look 20 feet away! 👀",
-  "Let's stand up and stretch for a minute! 🤸"
-];
-
-function checkIdleThoughts(now) {
-  if (now - lastIdleThoughtTime > 75000) {
-    lastIdleThoughtTime = now;
-    if (!isSettingsOpen && animationState.type !== 'interact') {
-      const thought = idleThoughts[Math.floor(Math.random() * idleThoughts.length)];
-      showSpeechBubble(thought, 4500);
-    }
-  }
-}
-
-function checkBreakReminders(now) {
-  if (now - lastBreakReminderTime > 1200 * 1000) {
-    lastBreakReminderTime = now;
-    if (!isSettingsOpen && animationState.type !== 'interact') {
-      const reminder = breakReminders[Math.floor(Math.random() * breakReminders.length)];
-      showSpeechBubble(reminder, 7000);
-      ipcRenderer.send('trigger-steam-achievement', 'ACH_TRAVEL_FAR');
-    }
-  }
-}
-
 const clock = new THREE.Clock();
 
 function animate() {
@@ -2019,9 +1951,6 @@ function animate() {
   const delta = clock.getDelta();
   const elapsed = clock.getElapsedTime();
   const now = Date.now();
-
-  checkIdleThoughts(now);
-  checkBreakReminders(now);
 
   // Update skeletal animation if active
   if (mixer) {
