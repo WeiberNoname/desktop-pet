@@ -1,0 +1,162 @@
+================================================================================
+PLAN UA2: STEAM INTEGRATION RESTORATION & ACHIEVEMENT RE-ENGINEERING PLAN
+================================================================================
+
+PROBLEM STATEMENT:
+Currently, the Steamworks SDK initialization and/or Steam Overlay is not appearing 
+or functioning correctly on screen within Desktop Pet V3. Because Steam overlay 
+and client binding are inactive, Steam achievements cannot be displayed or unlocked 
+in live mode.
+
+GOAL:
+Priority 1: Restore full native Steam SDK integration, Steam Overlay rendering, 
+            and active Steam status on screen.
+Priority 2: Re-bind and verify Steam achievement "Rookie" (NEW_ACHIEVEMENT_1_0) 
+            rendering on screen.
+
+================================================================================
+3 ALTERNATIVE TECHNICAL SOLUTIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+SOLUTION 1: DIRECTCOMPOSITION & CHROMIUM GPU FLAGS FIX FOR @skyatnpm/steamworks-js
+(Quickest Fix - Zero New Dependencies)
+--------------------------------------------------------------------------------
+
+Core Cause:
+Electron transparent windows (`transparent: true`) use Windows DirectComposition / 
+DWM transparency layers. Standard Steam Overlay (`GameOverlayRenderer64.dll`) fails 
+to hook into Chromium's rendering pipeline when GPU acceleration flags or App ID 
+locations are mismatched.
+
+Implementation Steps:
+1. App ID Placement:
+   - Copy `steam_appid.txt` (containing `480` or your assigned App ID) to BOTH:
+     a) Project root directory: `desktop-pet V3/steam_appid.txt`
+     b) Electron binary directory: `node_modules/electron/dist/steam_appid.txt`
+   - Reason: When running `npm start`, the OS process is `electron.exe` inside 
+     `node_modules/electron/dist/`, which requires `steam_appid.txt` in its own folder.
+
+2. Main Process Chromium Flags Fix (`main.js`):
+   - Replace conflicting GPU flags with proper DirectComposition hooks:
+     ```javascript
+     // Remove disable-direct-composition if it prevents overlay rendering
+     app.commandLine.appendSwitch('in-process-gpu');
+     app.commandLine.appendSwitch('disable-direct-composition', 'false');
+     app.commandLine.appendSwitch('enable-gpu-rasterization');
+     ```
+
+3. Steam Overlay Mouse Focus Restoration (`main.js`):
+   - When Steam Overlay activates (`gameOverlayActivated`), temporarily disable 
+     mouse click-through (`setIgnoreMouseEvents(false)`) so Steam Overlay receives 
+     input focus and draws overlay HUD elements on top of transparent canvas.
+
+Pros:
+- Uses existing package structure without requiring `npm install` changes.
+- Quick to test immediately in current environment.
+
+Cons:
+- Depends on `@skyatnpm/steamworks-js` binary compatibility with current Electron ABI.
+
+
+--------------------------------------------------------------------------------
+SOLUTION 2: UPGRADE TO INDUSTRY-STANDARD `steamworks.js` NATIVE BINDINGS
+(Recommended Production Fix)
+--------------------------------------------------------------------------------
+
+Core Cause:
+`@skyatnpm/steamworks-js` is a custom npm wrapper package that may lack full 
+Electron version support or overlay hook callbacks. Switching to the widely-used, 
+actively maintained `steamworks.js` native binding provides reliable Steam API hooks.
+
+Implementation Steps:
+1. Install Standard `steamworks.js`:
+   ```bash
+   npm install steamworks.js
+   ```
+
+2. Refactor Initialization in `main.js`:
+   ```javascript
+   const steamworks = require('steamworks.js');
+   
+   let client = null;
+   try {
+     // Initializes with App ID 480 (or your allocated Steam App ID)
+     client = steamworks.init(480);
+     logDiagnostic(`[Steamworks] Connected! Steam User: ${client.localplayer.getName()}`);
+   } catch (err) {
+     logDiagnostic(`[Steamworks] Connection failed: ${err.message}`);
+     client = new MockSteamClient();
+   }
+   ```
+
+3. Refactor Achievement Triggering in `main.js`:
+   ```javascript
+   ipcMain.on('trigger-steam-achievement', (event, rawName) => {
+     const achievementName = ACHIEVEMENT_MAP[rawName] || rawName;
+     if (client && client.achievement) {
+       // Activate achievement natively via steamworks.js
+       client.achievement.activate(achievementName);
+       logDiagnostic(`[Steam] Activated achievement: ${achievementName}`);
+     }
+   });
+   ```
+
+Pros:
+- Industry-proven Electron compatibility with thousands of published Steam apps.
+- Native TypeScript / JavaScript bindings for achievements, overlay, and stats.
+
+Cons:
+- Requires installing a new npm dependency.
+
+
+--------------------------------------------------------------------------------
+SOLUTION 3: DECOUPLED STANDALONE C#/C++ STEAM BRIDGE HELPER (`steam_bridge.exe`)
+(100% Guaranteed Fail-Safe Solution)
+--------------------------------------------------------------------------------
+
+Core Cause:
+Electron's Chromium multi-process sandbox and transparent window frame can 
+sometimes block DLL injection from Steam's `GameOverlayRenderer64.dll`. A native 
+standalone bridge process guarantees Steam API connectivity independent of Electron.
+
+Implementation Steps:
+1. Create Light C# / C++ Companion App (`steam_bridge.exe`):
+   - Compiles against official Valve `steam_api64.dll`.
+   - Initializes Steam API: `SteamAPI_Init()`.
+   - Listens for JSON commands on stdin / IPC socket (e.g. `{"action": "unlock", "name": "NEW_ACHIEVEMENT_1_0"}`).
+
+2. Electron Integration in `main.js`:
+   - Electron spawns `steam_bridge.exe` at app startup via `child_process.spawn()`.
+   - Main process sends IPC messages to stdin:
+     ```javascript
+     const { spawn } = require('child_process');
+     const steamBridge = spawn('./bin/steam_bridge.exe', ['480']);
+     
+     ipcMain.on('trigger-steam-achievement', (event, name) => {
+       steamBridge.stdin.write(JSON.stringify({ action: 'unlock', achievement: name }) + '\n');
+     });
+     ```
+
+Pros:
+- 100% immune to Node native module build issues, Electron ABI shifts, or Chromium transparency bugs.
+- Guarantees Steam client presence and native overlay toast pop-ups.
+
+Cons:
+- Requires compiling a small native `.exe` helper binary.
+
+
+================================================================================
+EXECUTION PLAN & PRIORITY ROADMAP
+================================================================================
+
+Phase 1: Steam Connection Restoration (Priority 1)
+  Step 1: Execute Solution 1 (GPU & `steam_appid.txt` relocation fix).
+  Step 2: If Solution 1 does not display Steam Overlay / active user status, execute Solution 2 (`steamworks.js`).
+  Step 3: Verify Steam active user persona name appears in `assets/diagnostics.log`.
+
+Phase 2: Achievement Triggering & Toast Rendering (Priority 2)
+  Step 1: Trigger `NEW_ACHIEVEMENT_1_0` ("Rookie") once Steam connection is verified.
+  Step 2: Confirm native Steam overlay toast popup displays on screen.
+  Step 3: Confirm in-app speech bubble toast displays overhead.
+================================================================================
