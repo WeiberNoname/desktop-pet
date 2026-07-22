@@ -172,6 +172,7 @@ async function init() {
   ipcRenderer.on('steam-achievement-unlocked', (event, result) => {
     if (result.success) {
       const achievementsInfo = {
+        'NEW_ACHIEVEMENT_1_0': 'Rookie (L1) 🏅',
         'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
         'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
         'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
@@ -185,6 +186,7 @@ async function init() {
     } else if (!result.isSteamOnline) {
       // Offline mode fallback: show the mock achievement toast
       const achievementsInfo = {
+        'NEW_ACHIEVEMENT_1_0': 'Rookie (L1) 🏅',
         'ACH_WIN_ONE_GAME': 'First Pet! 🐹',
         'ACH_WIN_100_GAMES': 'Hyperactive Petting! 🚀',
         'ACH_HEAVY_RADAR': 'Configured Companion! ⚙️',
@@ -1929,6 +1931,14 @@ function setupSettingsUI() {
     refreshLogsBtn.addEventListener('click', (event) => {
       event.preventDefault();
       loadDiagnosticsLogs();
+    });
+  }
+
+  const openOverlayBtn = document.getElementById('open-overlay-btn');
+  if (openOverlayBtn) {
+    openOverlayBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      ipcRenderer.send('open-steam-overlay', 'Friends');
     });
   }
 
