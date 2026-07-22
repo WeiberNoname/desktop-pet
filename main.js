@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -46,37 +46,76 @@ const isDevMode = process.argv.includes('--dev');
 logDiagnostic(`Developer Mode active: ${isDevMode}`);
 
 
+class MockSteamClient {
+  constructor() {
+    this.isInitialized = true;
+    this.isMock = true;
+    this.friends = {
+      getPersonaName: () => "Guest Pet Owner 🐰"
+    };
+    this.userStats = {
+      unlockedAchievements: new Set(),
+      getAchievement: (name) => {
+        return this.userStats.unlockedAchievements.has(name);
+      },
+      setAchievement: (name) => {
+        this.userStats.unlockedAchievements.add(name);
+        return true;
+      },
+      storeStats: () => {
+        console.log(`[Mock Steam] Stats stored.`);
+        return true;
+      }
+    };
+  }
+  on(event, callback) {
+    console.log(`[Mock Steam] Event listener registered for ${event}`);
+  }
+  shutdown() {
+    console.log(`[Mock Steam] Shutdown mock client.`);
+  }
+}
+
 let isSteamOverlayActive = false;
 let steamClient = null;
 let edgeCheckInterval = null;
-
-// Initialize Steamworks API directly using production module steamworks.js
-logDiagnostic('[Steamworks] Connecting to native Steam API (App ID 480)...');
+logDiagnostic('Loading Steamworks module @skyatnpm/steamworks-js...');
 try {
-  const steamworks = require('steamworks.js');
-  const client = steamworks.init(480);
-  const personaName = client.localplayer ? client.localplayer.getName() : "Steam User 🎮";
-  
-  steamClient = {
-    isInitialized: true,
-    client: client,
-    getPersonaName: () => personaName,
-    setAchievement: (name) => {
-      client.achievement.activate(name);
-      return true;
-    },
-    isAchievementUnlocked: (name) => {
-      return client.achievement.isUnlocked(name);
-    },
-    openOverlay: (dialog = 'Friends') => {
-      logDiagnostic(`[Steam API] Opening native overlay dialog: ${dialog}`);
-      client.overlay.activateDialog(dialog);
-      return true;
+  const { SteamClient } = require('@skyatnpm/steamworks-js');
+  logDiagnostic('Steamworks module loaded successfully. Initializing against App ID 480...');
+  const realClient = new SteamClient();
+  realClient.init(480).then((success) => {
+    if (success) {
+      steamClient = realClient;
+      logDiagnostic(`Steamworks API initialized successfully. Active user: ${steamClient.friends.getPersonaName()}`);
+      
+      // Register gameOverlayActivated event listener
+      steamClient.on('gameOverlayActivated', (active) => {
+        logDiagnostic(`[Steam Event] Overlay activated state changed to: ${active}`);
+        isSteamOverlayActive = active;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (active) {
+            mainWindow.setIgnoreMouseEvents(false);
+            mainWindow.setFullScreen(true);
+            mainWindow.webContents.send('steam-overlay-active', true);
+          } else {
+            mainWindow.setFullScreen(false);
+            mainWindow.setIgnoreMouseEvents(true, { forward: true });
+            mainWindow.webContents.send('steam-overlay-active', false);
+          }
+        }
+      });
+    } else {
+      logDiagnostic('Steamworks API initialization failed: init(480) returned false. Falling back to Mock Client.');
+      steamClient = new MockSteamClient();
     }
-  };
-  logDiagnostic(`[Steamworks SUCCESS] Connected! Live Steam Persona: ${personaName}`);
+  }).catch((err) => {
+    logDiagnostic(`Steamworks API initialization rejected: ${err.message || err}. Falling back to Mock Client.`);
+    steamClient = new MockSteamClient();
+  });
 } catch (err) {
-  logDiagnostic(`[Steamworks ERROR] Steam Client is not connected (${err.message}). Please ensure Steam Desktop App (steam.exe) is running.`);
+  logDiagnostic(`Failed to load Steamworks native binary or module: ${err.message || err}. Falling back to Mock Client.`);
+  steamClient = new MockSteamClient();
 }
 
 let mainWindow;
@@ -193,22 +232,11 @@ if (shouldOptimizeGPU()) {
 // Disable automatic DPI scaling to prevent window enlarging/shrinking when dragging across monitors
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
-// Steam Overlay hooks & DirectComposition GPU acceleration for Electron
+// Steam Overlay hooks for Electron
 app.commandLine.appendSwitch('in-process-gpu');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-begin-frame-scheduling');
+app.commandLine.appendSwitch('disable-direct-composition');
 
-app.on('ready', () => {
-  createWindow();
-  try {
-    globalShortcut.register('Shift+Tab', () => {
-      logDiagnostic('[Shortcut] Shift+Tab shortcut pressed.');
-      triggerSteamOverlay('Friends');
-    });
-  } catch (e) {
-    logDiagnostic(`[Shortcut] Shift+Tab shortcut registration: ${e.message}`);
-  }
-});
+app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
   if (steamClient && steamClient.isInitialized) {
@@ -291,35 +319,37 @@ ipcMain.on('resize-window', (event, size) => {
   }
 });
 
-// Map internal or legacy triggers to the configured Steamworks API Name (NEW_ACHIEVEMENT_1_0)
-const ACHIEVEMENT_MAP = {
-  'ACH_FIRST_STEPS': 'NEW_ACHIEVEMENT_1_0',
-  'ACH_WIN_ONE_GAME': 'NEW_ACHIEVEMENT_1_0',
-  'ACH_HEAVY_RADAR': 'NEW_ACHIEVEMENT_1_0',
-  'NEW_ACHIEVEMENT_1_0': 'NEW_ACHIEVEMENT_1_0'
-};
-
 // IPC handler to activate Steam achievements
-ipcMain.on('trigger-steam-achievement', (event, rawAchievementName) => {
-  const achievementName = ACHIEVEMENT_MAP[rawAchievementName] || rawAchievementName;
-  logDiagnostic(`Received request to trigger achievement: ${rawAchievementName} (Mapped API Name: ${achievementName})`);
+ipcMain.on('trigger-steam-achievement', (event, achievementName) => {
+  logDiagnostic(`Received request to trigger achievement: ${achievementName}`);
   if (steamClient && steamClient.isInitialized) {
     try {
-      const isUnlocked = steamClient.isAchievementUnlocked(achievementName);
-      if (!isUnlocked) {
-        steamClient.setAchievement(achievementName);
-        logDiagnostic(`[Steam SUCCESS] Achievement unlocked on Steam: ${achievementName}`);
-        event.reply('steam-achievement-unlocked', { success: true, name: achievementName, isSteamOnline: true });
+      const isActivated = steamClient.userStats.getAchievement(achievementName);
+      const isMock = !!steamClient.isMock;
+      if (!isActivated) {
+        steamClient.userStats.setAchievement(achievementName);
+        steamClient.userStats.storeStats();
+        logDiagnostic(`[Steam] Achievement successfully activated: ${achievementName} (isMock: ${isMock})`);
+        event.reply('steam-achievement-unlocked', { 
+          success: !isMock, 
+          name: achievementName, 
+          isSteamOnline: !isMock 
+        });
       } else {
-        logDiagnostic(`[Steam INFO] Achievement already unlocked: ${achievementName}`);
-        event.reply('steam-achievement-unlocked', { success: false, alreadyUnlocked: true, name: achievementName, isSteamOnline: true });
+        logDiagnostic(`[Steam] Achievement already unlocked: ${achievementName}`);
+        event.reply('steam-achievement-unlocked', { 
+          success: false, 
+          alreadyUnlocked: true, 
+          name: achievementName, 
+          isSteamOnline: !isMock 
+        });
       }
     } catch (err) {
-      logDiagnostic(`[Steam ERROR] Failed to unlock achievement ${achievementName}: ${err.message || err}`);
+      logDiagnostic(`[Steam] Error activating achievement ${achievementName}: ${err.message || err}`);
       event.reply('steam-achievement-unlocked', { success: false, error: err.message, name: achievementName, isSteamOnline: false });
     }
   } else {
-    logDiagnostic(`[Steam WARNING] Cannot trigger achievement ${achievementName}: Steam is not connected. Please open Steam client.`);
+    logDiagnostic(`[Steam] Failed to trigger achievement ${achievementName}: steamClient not initialized.`);
     event.reply('steam-achievement-unlocked', { success: false, name: achievementName, isSteamOnline: false });
   }
 });
@@ -357,29 +387,6 @@ ipcMain.on('is-dev-mode', (event) => {
 // IPC handler for renderer diagnostics logging
 ipcMain.on('log-diagnostic', (event, message) => {
   logDiagnostic(message);
-});
-
-// Helper to open native Steam overlay or launch Steam client protocol UI
-function triggerSteamOverlay(dialogName = 'Friends') {
-  logDiagnostic(`[Steam Overlay] Triggering overlay/interface for: ${dialogName}`);
-  if (steamClient && steamClient.isInitialized) {
-    try {
-      steamClient.openOverlay(dialogName);
-      logDiagnostic(`[Steam Overlay] Native overlay activated for ${dialogName}`);
-      return true;
-    } catch (err) {
-      logDiagnostic(`[Steam Overlay] Native hook failed (${err.message}). Opening via Steam Client protocol...`);
-    }
-  }
-  // Steam protocol fallback opens Steam Client directly to Friends/Community
-  shell.openExternal('steam://open/friends');
-  return true;
-}
-
-// IPC handler to open Steam overlay on demand
-ipcMain.on('open-steam-overlay', (event, dialogName) => {
-  const success = triggerSteamOverlay(dialogName || 'Friends');
-  event.reply('steam-overlay-result', { success });
 });
 
 

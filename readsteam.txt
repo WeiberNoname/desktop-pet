@@ -1,5 +1,5 @@
 ================================================================================
-STEAM LAUNCH GUIDE: SELLING YOUR 3D DESKTOP PET ON STEAM V3
+STEAM LAUNCH GUIDE: SELLING YOUR 3D DESKTOP PET ON STEAM V4
 ================================================================================
 
 This document details the complete process, technical integrations, and storefront

@@ -1,4 +1,4 @@
-COMMERCIAL APPLICATION AND SALES OUTLETS FOR 3D DESKTOP PETS V3
+COMMERCIAL APPLICATION AND SALES OUTLETS FOR 3D DESKTOP PETS V4
 
 This document outlines direct venues and methods where this interactive 3D desktop mascot application can be monetized and sold.
 
